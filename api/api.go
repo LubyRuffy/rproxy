@@ -39,6 +39,11 @@ func agentTokenAuth() gin.HandlerFunc {
 			}
 		}
 
+		if TokenAuth("") {
+			c.Set(authUserKey, "")
+			return
+		}
+
 		c.AbortWithStatusJSON(403, map[string]interface{}{
 			"code":    403,
 			"message": "invalid auth",
@@ -53,6 +58,9 @@ func meHandler(c *gin.Context) {
 // Start 启动服务器
 func Start(addr string) error {
 	//gin.SetMode(gin.ReleaseMode)
+
+	// 检查公网IP
+	GetPublicIP()
 
 	router := gin.Default()
 	pprof.Register(router, "dev/pprof") // http pprof, default is "debug/pprof"

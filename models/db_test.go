@@ -17,7 +17,8 @@ func TestSetupDB(t *testing.T) {
 	var err error
 	dbfile := filepath.Join(os.TempDir(), time.Now().Format("20060102150405.sqlite"))
 	defer os.Remove(dbfile)
-	db := SetupDB(dbfile)
+	db, err := SetupDB(dbfile)
+	assert.Nil(t, err)
 	assert.NotNil(t, db)
 	stmt := &gorm.Statement{DB: db}
 	stmt.Parse(&Proxy{})
@@ -51,6 +52,7 @@ func TestSetupDB(t *testing.T) {
 	d, err := GetDB().DB()
 	assert.Nil(t, err)
 	d.Close()
-	db = SetupDB(dbfile)
+	db, err = SetupDB(dbfile)
+	assert.Nil(t, err)
 	assert.NotNil(t, db)
 }

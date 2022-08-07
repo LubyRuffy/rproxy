@@ -9,7 +9,15 @@
 
 ## Feature
 - 提供api接口接收代理服务器的地址，并且验证入库
-  - /check 支持http/socks4/socks5/https/ssh等
+  - /check 支持
+    - http
+    - socks5
+    - https
+    - socks4
+    - ssh?
+  - 支持并发限制
+  - 失败也要入库
+  - 支持延迟参数（以服务器所在地为准，因为后续直接把服务器作为请求代理）
 - 代理服务器包含如下一些验证：
   - 是否支持http请求代理
   - 是否支持https请求代理，很多网站都是https网站，就不能用不支持CONNECT的http代理服务器

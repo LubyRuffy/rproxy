@@ -19,7 +19,7 @@ func SetupDB(dsn string) (*gorm.DB, error) {
 		//Logger: logger.Recorder.LogMode(logger.Silent),
 	}
 	if viper.GetBool("debug.dbsql") {
-		cfg.Logger = logger.Recorder.LogMode(logger.Info)
+		cfg.Logger = logger.Default.LogMode(logger.Info)
 	}
 
 	gdb, err = gorm.Open(sqlite.Open(dsn))

@@ -17,6 +17,7 @@ func main() {
 	viper.SetDefault("dbfile", "rproxy.sqlite")
 	viper.AddConfigPath(filepath.Dir(os.Args[0]))
 	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")
 	if err := viper.ReadInConfig(); err == nil {
 		log.Println("load config from file:", viper.ConfigFileUsed())
 	}

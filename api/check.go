@@ -155,7 +155,12 @@ func checkHost(host string) (string, http.Header) {
 			return fmt.Sprintf("%s://%s", "https", host), header
 		}
 	} else {
-		for _, protocol := range []string{"http", "socks5", "https", "socks4"} {
+		for _, protocol := range []string{
+			"http",
+			"socks5",
+			"https",
+			//"socks4",
+		} {
 			if ok, header := checkProtocolHost(protocol, host); ok {
 				return fmt.Sprintf("%s://%s", protocol, host), header
 			}

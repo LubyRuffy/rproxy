@@ -377,7 +377,7 @@ func checkHandler(c *gin.Context) {
 		p.ID = findProxy.ID
 	}
 
-	if err := models.GetDB().Model(models.Proxy{}).Save(p).Error; err != nil {
+	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Save(p).Error; err != nil {
 		log.Println("[WARNING] save proxy failed, url:", proxyUrl, ", err:", err)
 	}
 

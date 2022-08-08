@@ -22,7 +22,7 @@ func SetupDB(dsn string) (*gorm.DB, error) {
 		cfg.Logger = logger.Default.LogMode(logger.Info)
 	}
 
-	gdb, err = gorm.Open(sqlite.Open(dsn))
+	gdb, err = gorm.Open(sqlite.Open(dsn), cfg)
 	if err != nil {
 		return nil, err
 	}

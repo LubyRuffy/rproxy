@@ -33,7 +33,7 @@ func agentTokenAuth() gin.HandlerFunc {
 		if authLine := c.Request.Header.Get("Authorization"); authLine != "" {
 			// token xxx
 			auth := strings.SplitN(authLine, " ", 2)
-			if TokenAuth(auth[1]) {
+			if len(auth) == 2 && TokenAuth(auth[1]) {
 				c.Set(authUserKey, auth[1])
 				return
 			}

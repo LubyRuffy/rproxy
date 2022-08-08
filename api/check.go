@@ -90,8 +90,14 @@ var Transports = map[string]TransportFunc{
 	},
 }
 
+type proxyResult struct {
+	Valid  bool
+	Error  error
+	Header http.Header
+}
+
 // checkProtocolHost 第一个返回参数是是否为代理，第二个返回参数是返回的header
-func checkProtocolHost(protocol string, host string) (bool, http.Header) {
+func checkProtocolHost(protocol string, host string) *proxyResult {
 	var err error
 	defer func() {
 		errStr := ""
@@ -114,7 +120,7 @@ func checkProtocolHost(protocol string, host string) (bool, http.Header) {
 		req, err = http.NewRequest("GET", defaultCheckUrl, nil)
 		if err != nil {
 			log.Println("check host failed, host:", host, ", new request err:", err)
-			return false, nil
+			return &proxyResult{Error: err}
 		}
 		req.Header.Set(defaultCheckHeader, Version)
 
@@ -126,22 +132,30 @@ func checkProtocolHost(protocol string, host string) (bool, http.Header) {
 			header, err = defaultCheckFunc(resp)
 			if err != nil {
 				log.Println("check host failed, host:", host, ", decode err:", err)
-				return false, nil
+				return &proxyResult{Error: err}
 			}
 			if len(header) > 0 {
-				return true, resp.Header.Clone()
+				return &proxyResult{Valid: true, Header: resp.Header.Clone()}
 			}
 		}
 	}
-	return false, nil
+	return &proxyResult{}
 }
 
 // checkUrl 第一个返回参数是是否为代理，第二个返回参数是返回的header
-func checkUrl(u string) (bool, http.Header) {
+func checkUrl(u string) *proxyResult {
 	uParsed, err := url.Parse(u)
 	if err != nil {
 		log.Println("check url failed, url:", u, ", url parse err:", err)
-		return false, nil
+		return &proxyResult{Error: err}
+	}
+	if uParsed.Host == "" {
+		log.Println("check url failed, url is invalid")
+		return &proxyResult{Error: errors.New("url is invalid")}
+	}
+
+	if uParsed.Scheme == "" {
+		uParsed.Scheme = "http"
 	}
 
 	protocol := strings.ToLower(uParsed.Scheme)
@@ -151,8 +165,8 @@ func checkUrl(u string) (bool, http.Header) {
 // checkHost 第一个返回是代理的完整url，第二个返回是header
 func checkHost(host string) (string, http.Header) {
 	if strings.Contains(host, "443") {
-		if ok, header := checkProtocolHost("https", host); ok {
-			return fmt.Sprintf("%s://%s", "https", host), header
+		if p := checkProtocolHost("https", host); p.Valid {
+			return fmt.Sprintf("%s://%s", "https", host), p.Header
 		}
 	} else {
 		for _, protocol := range []string{
@@ -161,8 +175,8 @@ func checkHost(host string) (string, http.Header) {
 			"https",
 			//"socks4",
 		} {
-			if ok, header := checkProtocolHost(protocol, host); ok {
-				return fmt.Sprintf("%s://%s", protocol, host), header
+			if p := checkProtocolHost(protocol, host); p.Valid {
+				return fmt.Sprintf("%s://%s", protocol, host), p.Header
 			}
 		}
 	}
@@ -269,25 +283,22 @@ func checkProxyOfUrl(u string, header http.Header) *models.Proxy {
 // GetPublicIP 获取公网IP列表
 func GetPublicIP() string {
 	once.Do(func() {
-		resp, err := http.Get("https://httpbin.org/get")
-		//ips, err := net.LookupIP(defaultPublicHost)
+		resp, err := http.Get("https://stat.ripe.net/data/whats-my-ip/data.json")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Could not get IPs: %v\n", err)
 			os.Exit(1)
 		}
-		//for _, ip := range ips {
-		//	myPublicIP = append(myPublicIP, ip.String())
-		//	//fmt.Printf("google.com. IN A %s\n", ip.String())
-		//}
 		defer resp.Body.Close()
 		var r struct {
-			Origin string `json:"origin"`
+			Data struct {
+				IP string `json:"ip"`
+			} `json:"data"`
 		}
 		if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
 			fmt.Fprintf(os.Stderr, "Could not get IPs: %v\n", err)
 			os.Exit(1)
 		}
-		myPublicIP = r.Origin
+		myPublicIP = r.Data.IP
 	})
 
 	return myPublicIP
@@ -295,11 +306,10 @@ func GetPublicIP() string {
 
 func checkHandler(c *gin.Context) {
 	var proxyUrl string
-	var isProxy bool
 	var header http.Header
 	if proxyUrl = c.Query("url"); len(proxyUrl) > 0 {
 		// ?url=https://1.1.1.1:443
-		if isProxy, header = checkUrl(proxyUrl); !isProxy {
+		if p := checkUrl(proxyUrl); !p.Valid {
 			c.JSON(200, map[string]interface{}{
 				"code":    500,
 				"message": fmt.Sprintf("not valid proxy of url: %s", proxyUrl),
@@ -307,6 +317,16 @@ func checkHandler(c *gin.Context) {
 			return
 		}
 	} else if host := c.Query("host"); len(host) > 0 {
+		if strings.Contains(host, "://") {
+			if p := checkUrl(host); !p.Valid {
+				c.JSON(200, map[string]interface{}{
+					"code":    500,
+					"message": fmt.Sprintf("not valid proxy of url: %s", proxyUrl),
+				})
+				return
+			}
+		}
+
 		// ?host=1.1.1.1:80
 		if proxyUrl, header = checkHost(host); len(proxyUrl) == 0 {
 			c.JSON(200, map[string]interface{}{

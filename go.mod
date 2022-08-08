@@ -11,6 +11,7 @@ require (
 	github.com/stretchr/testify v1.7.1
 	gorm.io/driver/sqlite v1.3.6
 	gorm.io/gorm v1.23.8
+	h12.io/socks v1.0.3
 )
 
 require (
@@ -50,5 +51,4 @@ require (
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0 // indirect
-	h12.io/socks v1.0.3 // indirect
 )

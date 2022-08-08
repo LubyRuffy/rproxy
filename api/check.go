@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -92,8 +93,10 @@ var Transports = map[string]TransportFunc{
 
 type proxyResult struct {
 	Valid  bool
+	Cost   time.Duration
 	Error  error
 	Header http.Header
+	Url    string
 }
 
 // checkProtocolHost 第一个返回参数是是否为代理，第二个返回参数是返回的header
@@ -125,7 +128,10 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 		req.Header.Set(defaultCheckHeader, Version)
 
 		var resp *http.Response
+
+		startTime := time.Now()
 		if resp, err = client.Do(req); err == nil {
+			cost := time.Since(startTime)
 			defer resp.Body.Close()
 
 			var header string
@@ -135,7 +141,12 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 				return &proxyResult{Error: err}
 			}
 			if len(header) > 0 {
-				return &proxyResult{Valid: true, Header: resp.Header.Clone()}
+				return &proxyResult{
+					Valid:  true,
+					Header: resp.Header.Clone(),
+					Cost:   cost,
+					Url:    fmt.Sprintf("%s://%s", protocol, host),
+				}
 			}
 		}
 	}
@@ -163,10 +174,10 @@ func checkUrl(u string) *proxyResult {
 }
 
 // checkHost 第一个返回是代理的完整url，第二个返回是header
-func checkHost(host string) (string, http.Header) {
+func checkHost(host string) *proxyResult {
 	if strings.Contains(host, "443") {
 		if p := checkProtocolHost("https", host); p.Valid {
-			return fmt.Sprintf("%s://%s", "https", host), p.Header
+			return p
 		}
 	} else {
 		for _, protocol := range []string{
@@ -176,16 +187,16 @@ func checkHost(host string) (string, http.Header) {
 			//"socks4",
 		} {
 			if p := checkProtocolHost(protocol, host); p.Valid {
-				return fmt.Sprintf("%s://%s", protocol, host), p.Header
+				return p
 			}
 		}
 	}
 
-	return "", nil
+	return nil
 }
 
 // checkIpPort 第一个返回是代理的完整url，第二个返回是header
-func checkIpPort(ip string, port string) (string, http.Header) {
+func checkIpPort(ip string, port string) *proxyResult {
 	return checkHost(fmt.Sprintf("%s:%s", ip, port))
 }
 
@@ -209,7 +220,7 @@ func supportHttps(uParsed *url.URL) bool {
 }
 
 // header 可以是空
-func checkProxyOfUrl(u string, header http.Header) *models.Proxy {
+func checkProxyOfUrl(u string, checkResult *proxyResult) *models.Proxy {
 	uParsed, err := url.Parse(u)
 	port := -1
 	if portStr := uParsed.Port(); len(portStr) > 0 {
@@ -232,12 +243,12 @@ func checkProxyOfUrl(u string, header http.Header) *models.Proxy {
 	// 判断等级
 	proxyLevel := models.ProxyAnonymityElite
 	for _, key := range []string{"Via", "X-Forwarded-For", "X-RealIP", "X-RealIp"} {
-		if v := header.Get(key); len(v) > 0 {
+		if v := checkResult.Header.Get(key); len(v) > 0 {
 			proxyLevel = models.ProxyAnonymityAnonymous
 		}
 	}
-	for key := range header {
-		if v := header.Get(key); len(v) > 0 {
+	for key := range checkResult.Header {
+		if v := checkResult.Header.Get(key); len(v) > 0 {
 			if strings.Contains(v, myPublicIP) {
 				proxyLevel = models.ProxyAnonymityTransparent
 			}
@@ -250,7 +261,6 @@ func checkProxyOfUrl(u string, header http.Header) *models.Proxy {
 	// country
 	country := ""
 	if ipdb.Get() != nil {
-		var record map[string]interface{}
 		ip := net.ParseIP(uParsed.Host)
 		if ip == nil {
 			ips, err := net.LookupIP(uParsed.Host)
@@ -259,9 +269,9 @@ func checkProxyOfUrl(u string, header http.Header) *models.Proxy {
 			}
 		}
 		if ip != nil {
-			err = ipdb.Get().Lookup(ip, &record)
-			if err == nil {
-				country = record["country"].(map[string]interface{})["iso_code"].(string)
+			city, err := ipdb.Get().City(ip)
+			if err == nil && city != nil {
+				country = city.Country.IsoCode
 			}
 		}
 	}
@@ -275,6 +285,7 @@ func checkProxyOfUrl(u string, header http.Header) *models.Proxy {
 		Connect:      supportConnect,
 		Country:      country,
 		ProxyLevel:   proxyLevel,
+		Latency:      checkResult.Cost.Milliseconds(),
 		SuccessCount: 0,
 		FailedCount:  0,
 	}
@@ -306,10 +317,10 @@ func GetPublicIP() string {
 
 func checkHandler(c *gin.Context) {
 	var proxyUrl string
-	var header http.Header
+	var checkResult *proxyResult
 	if proxyUrl = c.Query("url"); len(proxyUrl) > 0 {
 		// ?url=https://1.1.1.1:443
-		if p := checkUrl(proxyUrl); !p.Valid {
+		if checkResult = checkUrl(proxyUrl); checkResult == nil || !checkResult.Valid {
 			c.JSON(200, map[string]interface{}{
 				"code":    500,
 				"message": fmt.Sprintf("not valid proxy of url: %s", proxyUrl),
@@ -318,7 +329,7 @@ func checkHandler(c *gin.Context) {
 		}
 	} else if host := c.Query("host"); len(host) > 0 {
 		if strings.Contains(host, "://") {
-			if p := checkUrl(host); !p.Valid {
+			if checkResult = checkUrl(host); checkResult == nil || !checkResult.Valid {
 				c.JSON(200, map[string]interface{}{
 					"code":    500,
 					"message": fmt.Sprintf("not valid proxy of url: %s", proxyUrl),
@@ -328,7 +339,7 @@ func checkHandler(c *gin.Context) {
 			proxyUrl = host
 		} else {
 			// ?host=1.1.1.1:80
-			if proxyUrl, header = checkHost(host); len(proxyUrl) == 0 {
+			if checkResult = checkHost(host); checkResult == nil || !checkResult.Valid {
 				c.JSON(200, map[string]interface{}{
 					"code":    500,
 					"message": fmt.Sprintf("not valid proxy of host: %s", host),
@@ -340,7 +351,7 @@ func checkHandler(c *gin.Context) {
 	} else if port := c.Query("port"); len(port) > 0 {
 		// ?ip=1.1.1.1&port=80
 		ip := c.Query("ip")
-		if proxyUrl, header = checkIpPort(ip, port); len(proxyUrl) == 0 {
+		if checkResult = checkIpPort(ip, port); checkResult == nil || !checkResult.Valid {
 			c.JSON(200, map[string]interface{}{
 				"code":    500,
 				"message": fmt.Sprintf("not valid proxy of ip/port : [%s:%s]", ip, port),
@@ -352,7 +363,7 @@ func checkHandler(c *gin.Context) {
 		return
 	}
 
-	p := checkProxyOfUrl(proxyUrl, header)
+	p := checkProxyOfUrl(proxyUrl, checkResult)
 	if p == nil {
 		c.JSON(200, map[string]interface{}{
 			"code":    500,
@@ -361,7 +372,12 @@ func checkHandler(c *gin.Context) {
 		return
 	}
 
-	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).FirstOrInit(p).Save(p).Error; err != nil {
+	var findProxy models.Proxy
+	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Find(&findProxy).Error; err == nil {
+		p.ID = findProxy.ID
+	}
+
+	if err := models.GetDB().Model(models.Proxy{}).Save(p).Error; err != nil {
 		log.Println("[WARNING] save proxy failed, url:", proxyUrl, ", err:", err)
 	}
 

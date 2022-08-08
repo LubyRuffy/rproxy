@@ -31,7 +31,7 @@ type Proxy struct {
 	Http            bool                `json:"http"`                                  //http代理可访问
 	Connect         bool                `json:"https"`                                 //https代理可访问
 	ProxyLevel      ProxyAnonymityLevel `json:"proxy_level"`                           //匿名级别
-	Latency         int                 `json:"latency"`                               //延迟，单位为ms
+	Latency         int64               `json:"latency"`                               //延迟，单位为ms
 	SuccessCount    int                 `json:"success_count"`                         //成功次数
 	FailedCount     int                 `json:"failed_count"`                          //失败次数
 	LastSuccessTime sql.NullTime        `json:"last_success_time"`                     //最后成功时间

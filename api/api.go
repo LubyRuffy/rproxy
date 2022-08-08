@@ -69,6 +69,7 @@ func Start(addr string) error {
 	v1 := router.Group(Prefix+"/v1", agentTokenAuth())
 	v1.GET("/me", meHandler)
 	v1.GET("/check", checkHandler)
+	v1.GET("/list", listHandler)
 
 	srv = &http.Server{
 		Addr:    addr,

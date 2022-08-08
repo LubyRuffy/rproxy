@@ -325,16 +325,18 @@ func checkHandler(c *gin.Context) {
 				})
 				return
 			}
+			proxyUrl = host
+		} else {
+			// ?host=1.1.1.1:80
+			if proxyUrl, header = checkHost(host); len(proxyUrl) == 0 {
+				c.JSON(200, map[string]interface{}{
+					"code":    500,
+					"message": fmt.Sprintf("not valid proxy of host: %s", host),
+				})
+				return
+			}
 		}
 
-		// ?host=1.1.1.1:80
-		if proxyUrl, header = checkHost(host); len(proxyUrl) == 0 {
-			c.JSON(200, map[string]interface{}{
-				"code":    500,
-				"message": fmt.Sprintf("not valid proxy of host: %s", host),
-			})
-			return
-		}
 	} else if port := c.Query("port"); len(port) > 0 {
 		// ?ip=1.1.1.1&port=80
 		ip := c.Query("ip")

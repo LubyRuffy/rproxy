@@ -65,6 +65,7 @@ func Start(addr string) error {
 	router := gin.Default()
 	pprof.Register(router, "dev/pprof") // http pprof, default is "debug/pprof"
 	router.GET("/status", statusHandler)
+	router.Any("/", proxyHandler)
 
 	v1 := router.Group(Prefix+"/v1", agentTokenAuth())
 	v1.GET("/me", meHandler)

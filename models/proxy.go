@@ -36,4 +36,5 @@ type Proxy struct {
 	FailedCount     int                 `json:"failed_count"`                          //失败次数
 	LastSuccessTime sql.NullTime        `json:"last_success_time"`                     //最后成功时间
 	LastFailedTime  sql.NullTime        `json:"last_failed_time"`                      //最后失败时间
+	LastError       string              `json:"last_error"`                            //最后失败时间
 }

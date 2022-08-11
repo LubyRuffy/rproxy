@@ -336,7 +336,6 @@ func checkHandler(c *gin.Context) {
 				})
 				return
 			}
-			proxyUrl = host
 		} else {
 			// ?host=1.1.1.1:80
 			if checkResult = checkHost(host); checkResult == nil || !checkResult.Valid {
@@ -346,7 +345,9 @@ func checkHandler(c *gin.Context) {
 				})
 				return
 			}
+
 		}
+		proxyUrl = checkResult.Url
 
 	} else if port := c.Query("port"); len(port) > 0 {
 		// ?ip=1.1.1.1&port=80
@@ -358,8 +359,14 @@ func checkHandler(c *gin.Context) {
 			})
 			return
 		}
+		proxyUrl = checkResult.Url
 	} else {
 		c.JSON(500, errors.New("param failed"))
+		return
+	}
+
+	if proxyUrl == "" {
+		c.JSON(500, errors.New("not proxy"))
 		return
 	}
 

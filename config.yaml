@@ -4,7 +4,10 @@ addr: ":8089"
 # 数据库文件
 dbfile: rproxy.sqlite
 
+# 是否开启认证
+auth: true
+
 # 调试信息
 debug:
   gin: false
-  dbsql: false
+  dbsql: true

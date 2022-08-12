@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/LubyRuffy/rproxy/models"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -16,8 +17,14 @@ var (
 	authUserKey = "token" // 存在context中的token主键
 
 	// TokenAuth 认证函数，可以覆盖
-	TokenAuth = func(token string) bool {
-		return true
+	TokenAuth = func(c *gin.Context, token string) bool {
+		var user models.User
+		if err := models.GetDB().Find(&user, "token=?", token).Error; err == nil && user.ID > 0 {
+			log.Println(user.Email, "auth ok")
+			c.Set(authUserKey, user.Email)
+			return true
+		}
+		return false
 	}
 )
 
@@ -31,24 +38,20 @@ func statusHandler(c *gin.Context) {
 
 func agentTokenAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if authLine := c.Request.Header.Get("Authorization"); authLine != "" {
-			// token xxx
-			auth := strings.SplitN(authLine, " ", 2)
-			if len(auth) == 2 && TokenAuth(auth[1]) {
-				c.Set(authUserKey, auth[1])
-				return
+		if viper.GetBool("auth") {
+			if authLine := c.Request.Header.Get("Authorization"); authLine != "" {
+				// token xxx
+				auth := strings.SplitN(authLine, " ", 2)
+				if len(auth) == 2 && TokenAuth(c, auth[1]) {
+					return
+				}
 			}
-		}
 
-		if TokenAuth("") {
-			c.Set(authUserKey, "")
-			return
+			c.AbortWithStatusJSON(403, map[string]interface{}{
+				"code":    403,
+				"message": "invalid auth",
+			})
 		}
-
-		c.AbortWithStatusJSON(403, map[string]interface{}{
-			"code":    403,
-			"message": "invalid auth",
-		})
 	}
 }
 

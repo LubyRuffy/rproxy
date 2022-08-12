@@ -175,6 +175,9 @@ func checkUrl(u string) *proxyResult {
 
 // checkHost 第一个返回是代理的完整url，第二个返回是header
 func checkHost(host string) *proxyResult {
+	if !strings.Contains(host, ":") {
+		return checkProtocolHost("http", host+":80")
+	}
 	if strings.Contains(host, "443") {
 		if p := checkProtocolHost("https", host); p.Valid {
 			return p

@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -25,6 +26,21 @@ func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodConnect {
 		db = db.Where(&models.Proxy{Connect: true})
+	}
+
+	if filter := r.Header.Get("X-Rproxy-Filter"); len(filter) > 0 {
+		v, err := url.ParseQuery(filter)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		for k, vs := range v {
+			switch k {
+			case "type":
+				db = db.Where(&models.Proxy{ProxyType: vs[0]})
+			}
+		}
+		r.Header.Del("X-Rproxy-Filter")
 	}
 
 	// 每次取三条测试
@@ -46,7 +62,7 @@ func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
 				var err error
 
 				switch p.ProxyType {
-				case "socks5":
+				case "socks5", "socks4":
 					conn, err = socks.Dial(p.ProxyURL)(network, addr)
 				case "http", "https":
 					if r.Method == http.MethodConnect {

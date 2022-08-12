@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/viper"
 	"log"
 	"net/http"
-	"strings"
 )
 
 var (
@@ -39,10 +38,8 @@ func statusHandler(c *gin.Context) {
 func agentTokenAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if viper.GetBool("auth") {
-			if authLine := c.Request.Header.Get("Authorization"); authLine != "" {
-				// token xxx
-				auth := strings.SplitN(authLine, " ", 2)
-				if len(auth) == 2 && TokenAuth(c, auth[1]) {
+			if authLine := c.Request.Header.Get("X-Rproxy-Token"); authLine != "" {
+				if len(authLine) > 0 && TokenAuth(c, authLine) {
 					return
 				}
 			}
@@ -73,11 +70,11 @@ func Start(addr string) error {
 	router := gin.Default()
 	pprof.Register(router, "dev/pprof") // http pprof, default is "debug/pprof"
 	router.GET("/status", statusHandler)
+	router.GET("/check", checkHandler)
 	router.Any("/", proxyHandler)
 
 	v1 := router.Group(Prefix+"/v1", agentTokenAuth())
 	v1.GET("/me", meHandler)
-	v1.GET("/check", checkHandler)
 	v1.GET("/list", listHandler)
 
 	log.Println("api server listened at:", addr)
@@ -86,7 +83,8 @@ func Start(addr string) error {
 	srv = &http.Server{
 		Addr: addr,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodConnect {
+			//if r.Method == http.MethodConnect {
+			if len(r.RequestURI) > 0 && r.RequestURI[0] != '/' {
 				proxyServeHTTP(w, r)
 			} else {
 				router.ServeHTTP(w, r)

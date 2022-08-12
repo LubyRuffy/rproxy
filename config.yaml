@@ -1,2 +1,10 @@
+# 绑定端口
+addr: ":8089"
+
+# 数据库文件
+dbfile: rproxy.sqlite
+
+# 调试信息
 debug:
-  dbsql: true
+  gin: false
+  dbsql: false

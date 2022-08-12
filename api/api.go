@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 	"log"
 	"net/http"
 	"strings"
@@ -57,7 +58,11 @@ func meHandler(c *gin.Context) {
 
 // Start 启动服务器
 func Start(addr string) error {
-	//gin.SetMode(gin.ReleaseMode)
+	if viper.GetBool("debug.gin") {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	// 检查公网IP
 	GetPublicIP()
@@ -72,11 +77,19 @@ func Start(addr string) error {
 	v1.GET("/check", checkHandler)
 	v1.GET("/list", listHandler)
 
-	srv = &http.Server{
-		Addr:    addr,
-		Handler: router,
-	}
 	log.Println("api server listened at:", addr)
+	//return router.Run(addr)
+
+	srv = &http.Server{
+		Addr: addr,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodConnect {
+				proxyServeHTTP(w, r)
+			} else {
+				router.ServeHTTP(w, r)
+			}
+		}),
+	}
 	return srv.ListenAndServe()
 }
 

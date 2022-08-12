@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -20,68 +19,47 @@ var (
 	defaultTimeOut = time.Second * 15
 )
 
-type httpWriter struct {
-	h    http.Header
-	buf  bufio.Writer
-	code int
-}
-
-func (hw httpWriter) Header() http.Header {
-	return hw.h
-}
-
-func (hw httpWriter) Write(p []byte) (int, error) {
-	return hw.buf.Write(p)
-}
-
-func (hw httpWriter) WriteHeader(statusCode int) {
-	hw.code = statusCode
-}
-
-func proxyHandler(c *gin.Context) {
+func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
 	db := models.GetDB()
 	proxy := goproxy.NewProxyHttpServer()
 
-	if c.Request.Method == http.MethodConnect {
+	if r.Method == http.MethodConnect {
 		db = db.Where(&models.Proxy{Connect: true})
 	}
 
 	// 每次取三条测试
 	var ps []models.Proxy
-	if err := models.GetDB().Order("RANDOM()").Limit(3).Find(&ps).Error; err != nil {
-		c.JSON(500, map[string]interface{}{
-			"code":    500,
-			"message": fmt.Sprintf("db failed: %v", err),
-		})
+	if err := db.Order("RANDOM()").Limit(3).Find(&ps).Error; err != nil || len(ps) == 0 {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	proxy.Tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+	dialFn := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		ch := make(chan net.Conn, 1)
 		hasSign := false
 		var signLock sync.Mutex
 		for _, p := range ps {
 			go func(p models.Proxy) {
-				log.Printf("fetch %s from %s", c.Request.RequestURI, p.ProxyURL)
+				log.Printf("fetch %s from %s", r.RequestURI, p.ProxyURL)
 
 				var conn net.Conn
 				var err error
 
-				if c.Request.Method == http.MethodConnect {
-					switch p.ProxyType {
-					case "http", "https":
+				switch p.ProxyType {
+				case "socks5":
+					conn, err = socks.Dial(p.ProxyURL)(network, addr)
+				case "http", "https":
+					if r.Method == http.MethodConnect {
 						conn, err = proxy.NewConnectDialToProxy(p.ProxyURL)(network, addr)
-					case "socks5":
-						conn, err = socks.Dial(p.ProxyURL)(network, addr)
+					} else {
+						conn, err = net.Dial(network, fmt.Sprintf("%s:%d", p.IP, p.Port))
 					}
-				} else {
-					//http.ProxyURL()
-					conn, err = net.Dial(network, addr)
 				}
 
 				if err != nil {
 					p.FailedCount++
 					p.LastFailedTime.Time = time.Now()
+					p.LastFailedTime.Valid = true
 					p.LastError = err.Error()
 					models.GetDB().Save(&p)
 					return
@@ -94,6 +72,7 @@ func proxyHandler(c *gin.Context) {
 					ch <- conn
 					p.SuccessCount++
 					p.LastSuccessTime.Time = time.Now()
+					p.LastSuccessTime.Valid = true
 					models.GetDB().Save(&p)
 				}
 			}(p)
@@ -109,11 +88,20 @@ func proxyHandler(c *gin.Context) {
 		return nil, errors.New("no alive proxy")
 	}
 
+	proxy.ConnectDial = func(network string, addr string) (net.Conn, error) {
+		return dialFn(context.Background(), network, addr)
+	}
+	proxy.Tr.DialContext = dialFn
+
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		if resp != nil {
 			log.Println(resp.StatusCode, resp.Request.URL, resp.Request.RequestURI)
 		}
 		return resp
 	})
-	proxy.ServeHTTP(c.Writer, c.Request)
+	proxy.ServeHTTP(w, r)
+}
+
+func proxyHandler(c *gin.Context) {
+	proxyServeHTTP(c.Writer, c.Request)
 }

@@ -20,7 +20,10 @@ var (
 		var user models.User
 		if err := models.GetDB().Find(&user, "token=?", token).Error; err == nil && user.ID > 0 {
 			log.Println(user.Email, "auth ok")
-			c.Set(authUserKey, user.Email)
+			if c != nil {
+				c.Set(authUserKey, user.Email)
+			}
+
 			return true
 		}
 		return false
@@ -85,6 +88,7 @@ func Start(addr string) error {
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			//if r.Method == http.MethodConnect {
 			if len(r.RequestURI) > 0 && r.RequestURI[0] != '/' {
+				//agentTokenAuth()(&gin.Context{Request: r})
 				proxyServeHTTP(w, r)
 			} else {
 				router.ServeHTTP(w, r)

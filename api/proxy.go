@@ -7,6 +7,7 @@ import (
 	"github.com/LubyRuffy/rproxy/models"
 	"github.com/elazarl/goproxy"
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 	"h12.io/socks"
 	"log"
 	"net"
@@ -21,6 +22,15 @@ var (
 )
 
 func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if viper.GetBool("auth") {
+		if authLine := r.Header.Get("X-Rproxy-Token"); authLine != "" {
+			if len(authLine) == 0 || !TokenAuth(nil, authLine) {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+		}
+	}
+
 	db := models.GetDB()
 	proxy := goproxy.NewProxyHttpServer()
 

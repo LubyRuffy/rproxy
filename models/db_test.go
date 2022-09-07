@@ -3,7 +3,9 @@ package models
 import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,4 +57,51 @@ func TestSetupDB(t *testing.T) {
 	db, err = SetupDB(dbfile)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
+}
+
+func TestGetDB(t *testing.T) {
+	type User struct {
+		gorm.Model
+		Name string
+	}
+
+	type Proxy struct {
+		gorm.Model
+		Name string
+	}
+
+	// UserProxy 用户对应代理表
+	type UserProxy struct {
+		gorm.Model
+		UserID int  `gorm:"primaryKey;autoIncrement:false;uniqueIndex:idx_user_proxy,priority:1"`
+		User   User `gorm:"foreignKey:UserID"`
+
+		ProxyID int   `gorm:"primaryKey;autoIncrement:false;uniqueIndex:idx_user_proxy,priority:2"`
+		Proxy   Proxy `gorm:"foreignKey:ProxyID"`
+	}
+
+	// 确保文件生成，并且有表结构
+	var err error
+	dbfile := filepath.Join(os.TempDir(), time.Now().Format("20060102150405.sqlite"))
+	defer os.Remove(dbfile)
+	db, err := gorm.Open(sqlite.Open(dbfile), &gorm.Config{Logger: logger.Default.LogMode(logger.Info)})
+	assert.Nil(t, err)
+	assert.NotNil(t, db)
+	err = db.AutoMigrate(&User{}, &Proxy{}, &UserProxy{})
+	assert.Nil(t, err)
+
+	err = db.Save(&UserProxy{
+		User: User{
+			Name: "a",
+		},
+		Proxy: Proxy{
+			Name: "b",
+		},
+	}).Error
+	assert.Nil(t, err)
+	var ab1 UserProxy
+	err = db.Preload("User").Preload("Proxy").First(&ab1).Error
+	assert.Nil(t, err)
+	assert.Equal(t, ab1.User.Name, "a")
+	assert.Equal(t, ab1.Proxy.Name, "b")
 }

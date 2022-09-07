@@ -13,7 +13,8 @@ var (
 	srv         *http.Server // http服务器
 	Version     = "v0.1.1"
 	Prefix      = "/api"
-	authUserKey = "token" // 存在context中的token主键
+	authUserKey = "token"  // 存在context中的token主键
+	authUserId  = "userId" // 存在context中的token主键
 
 	// TokenAuth 认证函数，可以覆盖
 	TokenAuth = func(c *gin.Context, token string) bool {
@@ -22,6 +23,7 @@ var (
 			log.Println(user.Email, "auth ok")
 			if c != nil {
 				c.Set(authUserKey, user.Email)
+				c.Set(authUserId, user.ID)
 			}
 
 			return true
@@ -29,6 +31,14 @@ var (
 		return false
 	}
 )
+
+// userId 获取当前登录的user id
+func userId(c *gin.Context) uint {
+	if v, exists := c.Get(authUserId); exists {
+		return v.(uint)
+	}
+	return 0
+}
 
 func statusHandler(c *gin.Context) {
 	//c.JSON() c.IndentedJSON()
@@ -79,6 +89,7 @@ func Start(addr string) error {
 	v1 := router.Group(Prefix+"/v1", agentTokenAuth())
 	v1.GET("/me", meHandler)
 	v1.GET("/list", listHandler)
+	v1.GET("/check", checkHandler)
 
 	log.Println("api server listened at:", addr)
 	//return router.Run(addr)

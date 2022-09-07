@@ -319,7 +319,7 @@ func GetPublicIP() string {
 }
 
 // fillProxyField 填充代理属性
-func fillProxyField(proxyUrl string, checkResult *proxyResult) {
+func fillProxyField(proxyUrl string, checkResult *proxyResult, uid uint) {
 	p := checkProxyOfUrl(proxyUrl, checkResult)
 	if p == nil {
 		return
@@ -332,6 +332,13 @@ func fillProxyField(proxyUrl string, checkResult *proxyResult) {
 
 	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Save(p).Error; err != nil {
 		log.Println("[WARNING] save proxy failed, url:", proxyUrl, ", err:", err)
+	}
+
+	if uid > 0 {
+		models.GetDB().Save(&models.UserProxy{
+			UserID:  uid,
+			ProxyID: p.ID,
+		})
 	}
 }
 
@@ -391,7 +398,7 @@ func checkHandler(c *gin.Context) {
 	}
 
 	// 只要是代理，就返回ok，其他属性放到后台执行
-	go fillProxyField(proxyUrl, checkResult)
+	go fillProxyField(proxyUrl, checkResult, userId(c))
 
 	c.JSON(200, map[string]interface{}{
 		"code": 200,

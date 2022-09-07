@@ -222,7 +222,7 @@ func supportHttps(uParsed *url.URL) bool {
 	return false
 }
 
-// header 可以是空
+// checkProxyOfUrl 检查代理的一些属性
 func checkProxyOfUrl(u string, checkResult *proxyResult) *models.Proxy {
 	uParsed, err := url.Parse(u)
 	port := -1
@@ -318,6 +318,23 @@ func GetPublicIP() string {
 	return myPublicIP
 }
 
+// fillProxyField 填充代理属性
+func fillProxyField(proxyUrl string, checkResult *proxyResult) {
+	p := checkProxyOfUrl(proxyUrl, checkResult)
+	if p == nil {
+		return
+	}
+
+	var findProxy models.Proxy
+	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Find(&findProxy).Error; err == nil {
+		p.ID = findProxy.ID
+	}
+
+	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Save(p).Error; err != nil {
+		log.Println("[WARNING] save proxy failed, url:", proxyUrl, ", err:", err)
+	}
+}
+
 func checkHandler(c *gin.Context) {
 	var proxyUrl string
 	var checkResult *proxyResult
@@ -373,23 +390,8 @@ func checkHandler(c *gin.Context) {
 		return
 	}
 
-	p := checkProxyOfUrl(proxyUrl, checkResult)
-	if p == nil {
-		c.JSON(200, map[string]interface{}{
-			"code":    500,
-			"message": fmt.Sprintf("not valid proxy of url: %s", proxyUrl),
-		})
-		return
-	}
-
-	var findProxy models.Proxy
-	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Find(&findProxy).Error; err == nil {
-		p.ID = findProxy.ID
-	}
-
-	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Save(p).Error; err != nil {
-		log.Println("[WARNING] save proxy failed, url:", proxyUrl, ", err:", err)
-	}
+	// 只要是代理，就返回ok，其他属性放到后台执行
+	go fillProxyField(proxyUrl, checkResult)
 
 	c.JSON(200, map[string]interface{}{
 		"code": 200,

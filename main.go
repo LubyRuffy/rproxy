@@ -15,6 +15,7 @@ func main() {
 	// 加载配置文件
 	viper.SetDefault("addr", ":8088")
 	viper.SetDefault("dbfile", "rproxy.sqlite")
+	viper.SetDefault("debug.dbsql", false)
 	viper.AddConfigPath(filepath.Dir(os.Args[0]))
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")

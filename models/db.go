@@ -27,7 +27,7 @@ func SetupDB(dsn string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err = gdb.AutoMigrate(&Proxy{}, &CheckLog{}, &User{}); err != nil {
+	if err = gdb.AutoMigrate(&Proxy{}, &CheckLog{}, &User{}, &UserProxy{}); err != nil {
 		return nil, err
 	}
 

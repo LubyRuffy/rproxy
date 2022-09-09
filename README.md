@@ -31,7 +31,9 @@
   - [x] /list 输出对应的代理属性
 - [x] 本身提供http[s]/socks5代理功能
   - [ ] 支持账号验证
-- [x] 支持账号验证，通过X-Rproxy-Token头进行 ```curl -H "X-Rproxy-Token: 1234" http://127.0.0.1:8089/api/v1/list | jq```
+- [x] 支持账号
+  - [ ] 支持注册
+  - [x] 支持验证，通过X-Rproxy-Token头进行 ```curl -H "X-Rproxy-Token: 1234" http://127.0.0.1:8089/api/v1/list | jq```
 - [x] 支持过滤器设置，通过X-Rproxy-Filter进行 ```curl -H "X-Rproxy-Filter: type=socks5" http://127.0.0.1:8089 ip.bmh.im/c```
   - [x] 支持转发时删除过滤器
 - [x] 支持数据库存储

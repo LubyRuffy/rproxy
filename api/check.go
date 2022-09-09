@@ -9,6 +9,7 @@ import (
 	"github.com/LubyRuffy/myip/ipdb"
 	"github.com/LubyRuffy/rproxy/models"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm/clause"
 	"h12.io/socks"
 	"io/ioutil"
 	"log"
@@ -318,6 +319,30 @@ func GetPublicIP() string {
 	return myPublicIP
 }
 
+// insertProxyToDb 插入代理表，如果有用户信息，也要插入关联表
+func insertProxyToDb(p *models.Proxy, uid uint) error {
+	var findProxy models.Proxy
+	if err := models.GetDB().Where(models.Proxy{ProxyURL: p.ProxyURL}).Find(&findProxy).Error; err == nil {
+		p.ID = findProxy.ID
+	}
+
+	if err := models.GetDB().Where(models.Proxy{ProxyURL: p.ProxyURL}).Save(p).Error; err != nil {
+		return err
+	}
+
+	// 写入关系表
+	if uid > 0 {
+		if err := models.GetDB().Clauses(clause.OnConflict{DoNothing: true}).Create(&models.UserProxy{
+			UserID:  uid,
+			ProxyID: p.ID,
+		}).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // fillProxyField 填充代理属性
 func fillProxyField(proxyUrl string, checkResult *proxyResult, uid uint) {
 	p := checkProxyOfUrl(proxyUrl, checkResult)
@@ -325,20 +350,8 @@ func fillProxyField(proxyUrl string, checkResult *proxyResult, uid uint) {
 		return
 	}
 
-	var findProxy models.Proxy
-	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Find(&findProxy).Error; err == nil {
-		p.ID = findProxy.ID
-	}
-
-	if err := models.GetDB().Where(models.Proxy{ProxyURL: proxyUrl}).Save(p).Error; err != nil {
-		log.Println("[WARNING] save proxy failed, url:", proxyUrl, ", err:", err)
-	}
-
-	if uid > 0 {
-		models.GetDB().Save(&models.UserProxy{
-			UserID:  uid,
-			ProxyID: p.ID,
-		})
+	if err := insertProxyToDb(p, uid); err != nil {
+		log.Println("[WARNING] save user proxy failed, url:", proxyUrl, ", err:", err)
 	}
 }
 

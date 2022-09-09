@@ -11,7 +11,7 @@ import (
 
 var (
 	srv         *http.Server // http服务器
-	Version     = "v0.1.1"
+	Version     = "v0.1.2"
 	Prefix      = "/api"
 	authUserKey = "token"  // 存在context中的token主键
 	authUserId  = "userId" // 存在context中的token主键

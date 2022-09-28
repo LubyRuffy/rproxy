@@ -1,12 +1,19 @@
 package api
 
 import (
+	"errors"
+	"fmt"
+	"github.com/LubyRuffy/gorestful"
 	"github.com/LubyRuffy/rproxy/models"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
+	"gorm.io/gorm"
 	"log"
 	"net/http"
+	"strings"
 )
 
 var (
@@ -69,6 +76,132 @@ func meHandler(c *gin.Context) {
 	c.String(200, "%s", c.GetString(authUserKey))
 }
 
+func loadRestApi(router *gin.Engine) {
+
+	type MyClaims struct {
+		jwt.RegisteredClaims
+		UID      uint
+		Username string
+		Token    string
+	}
+
+	var am *gorestful.AuthMiddle
+	if viper.GetBool("auth") {
+		am = &gorestful.AuthMiddle{
+			AuthMode: &gorestful.EmbedLogin{
+				OpenRegister: true,
+				Register: func(c *gin.Context, e *gorestful.EmbedLogin, formMap map[string]string) error {
+					var user models.User
+					err := mapstructure.Decode(formMap, &user)
+					if err != nil {
+						return err
+					}
+
+					err = models.GetDB().Where(&user).Find(&user).Error
+					if err == nil && user.ID > 0 {
+						return errors.New("exists user")
+					}
+					err = models.GetDB().Model(&user).Save(&user).Error
+					return err
+				},
+				RouterGroup: router.Group("/"),
+				LoginFields: []gorestful.LoginField{
+					{
+						Name:        "email",
+						DisplayName: "Email",
+						Type:        "text",
+					},
+					{
+						Name:        "token",
+						DisplayName: "Token",
+						Type:        "text",
+					},
+				},
+				CheckValid: func(c *gin.Context, e *gorestful.EmbedLogin, formMap map[string]string) (string, bool) {
+					var checkUser models.User
+					if err := mapstructure.Decode(formMap, &checkUser); err != nil {
+						return "", false
+					}
+
+					var user models.User
+					if err := models.GetDB().Where(&checkUser).Find(&user).Error; err == nil && user.ID > 0 {
+						log.Println(user.Email, "auth ok")
+
+						t := jwt.NewWithClaims(jwt.SigningMethodHS512, MyClaims{
+							UID:      user.ID,
+							Username: user.Email,
+							Token:    user.Token,
+						})
+
+						if tokenString, err := t.SignedString(e.Key); err == nil {
+							return tokenString, true
+						} else {
+							log.Println("jwt failed:", err)
+						}
+						return "", false
+					}
+
+					return "", false
+				},
+			},
+		}
+	}
+
+	res, err := gorestful.NewResource(
+		gorestful.WithGinEngine(router),
+		gorestful.WithGormDb(func(c *gin.Context) *gorm.DB {
+			if uid := userId(c); uid > 0 {
+				return models.GetDB().Model(&models.Proxy{}).
+					Joins("join user_proxies on user_proxies.proxy_id=proxies.id").
+					Where("user_proxies.proxy_id>0 and user_proxies.user_id=?", uid)
+			}
+			panic("not valid user")
+			return models.GetDB().Model(&models.Proxy{})
+		}),
+		gorestful.WithUserStruct(func() interface{} {
+			return &models.Proxy{}
+		}),
+		gorestful.WithApiRouterGroup(router.Group("/api", func(c *gin.Context) {
+			if tokenString := c.Request.Header.Get(am.HeaderKey); tokenString != "" {
+				if len(am.HeaderValuePrefix) > 0 && strings.Contains(tokenString, am.HeaderValuePrefix) {
+					tokenString = strings.Split(tokenString, am.HeaderValuePrefix)[1]
+				}
+				token, err := jwt.ParseWithClaims(tokenString, &MyClaims{}, func(token *jwt.Token) (interface{}, error) {
+					// Don't forget to validate the alg is what you expect:
+					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+						return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+					}
+
+					// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
+					return am.AuthMode.(*gorestful.EmbedLogin).Key, nil
+				})
+				if err == nil {
+					if claims, ok := token.Claims.(*MyClaims); ok && token.Valid {
+						log.Println(claims.Username)
+						c.Set(authUserKey, claims.Token)
+						c.Set(authUserId, claims.UID)
+						return
+					}
+				}
+				log.Println("login failed:", err)
+			}
+
+			c.AbortWithStatusJSON(403, map[string]interface{}{
+				"code":    403,
+				"message": "invalid auth",
+			})
+		})),
+		gorestful.WithID("proxies.id"),
+		gorestful.WithAfterInsert(func(c *gin.Context, id uint) error {
+			return models.GetDB().Save(&models.UserProxy{UserID: userId(c), ProxyID: id}).Error
+		}),
+		gorestful.WithAuthMiddle(am))
+	if err != nil {
+		panic(err)
+	}
+	gorestful.AddResourceApiPageToGin(res)
+}
+
 // Start 启动服务器
 func Start(addr string) error {
 	if viper.GetBool("debug.gin") {
@@ -90,6 +223,8 @@ func Start(addr string) error {
 	v1.GET("/me", meHandler)
 	v1.GET("/list", listHandler)
 	v1.GET("/check", checkHandler)
+
+	loadRestApi(router)
 
 	log.Println("api server listened at:", addr)
 	//return router.Run(addr)

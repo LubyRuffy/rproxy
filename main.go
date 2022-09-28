@@ -5,6 +5,7 @@ import (
 	"github.com/LubyRuffy/myip/ipdb"
 	"github.com/LubyRuffy/rproxy/api"
 	"github.com/LubyRuffy/rproxy/models"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"log"
 	"os"
@@ -16,9 +17,15 @@ func main() {
 	viper.SetDefault("addr", ":8088")
 	viper.SetDefault("dbfile", "rproxy.sqlite")
 	viper.SetDefault("debug.dbsql", false)
+
+	pflag.Bool("auth", false, "enable auth")
+	pflag.Parse()
+	viper.BindPFlags(pflag.CommandLine)
+
 	viper.AddConfigPath(filepath.Dir(os.Args[0]))
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
+	viper.Debug()
 	if err := viper.ReadInConfig(); err == nil {
 		log.Println("load config from file:", viper.ConfigFileUsed())
 	}

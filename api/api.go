@@ -85,9 +85,16 @@ func loadRestApi(router *gin.Engine) {
 		Token    string
 	}
 
+	var userInfo func(c *gin.Context) *MyClaims
 	var am *gorestful.AuthMiddle
 	if viper.GetBool("auth") {
 		am = &gorestful.AuthMiddle{
+			GetUser: func(c *gin.Context) string {
+				if info := userInfo(c); info != nil {
+					return info.Username
+				}
+				return ""
+			},
 			AuthMode: &gorestful.EmbedLogin{
 				OpenRegister: true,
 				Register: func(c *gin.Context, e *gorestful.EmbedLogin, formMap map[string]string) error {
@@ -105,7 +112,7 @@ func loadRestApi(router *gin.Engine) {
 					return err
 				},
 				RouterGroup: router.Group("/"),
-				LoginFields: []gorestful.LoginField{
+				LoginFields: []*gorestful.LoginField{
 					{
 						Name:        "email",
 						DisplayName: "Email",
@@ -117,7 +124,7 @@ func loadRestApi(router *gin.Engine) {
 						Type:        "text",
 					},
 				},
-				CheckValid: func(c *gin.Context, e *gorestful.EmbedLogin, formMap map[string]string) (string, bool) {
+				CheckLogin: func(c *gin.Context, e *gorestful.EmbedLogin, formMap map[string]string) (string, bool) {
 					var checkUser models.User
 					if err := mapstructure.Decode(formMap, &checkUser); err != nil {
 						return "", false
@@ -145,6 +152,31 @@ func loadRestApi(router *gin.Engine) {
 				},
 			},
 		}
+
+		userInfo = func(c *gin.Context) *MyClaims {
+			if tokenString := c.Request.Header.Get(am.HeaderKey); tokenString != "" {
+				if len(am.HeaderValuePrefix) > 0 && strings.Contains(tokenString, am.HeaderValuePrefix) {
+					tokenString = strings.Split(tokenString, am.HeaderValuePrefix)[1]
+				}
+				token, err := jwt.ParseWithClaims(tokenString, &MyClaims{}, func(token *jwt.Token) (interface{}, error) {
+					// Don't forget to validate the alg is what you expect:
+					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+						return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+					}
+
+					// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
+					return am.AuthMode.(*gorestful.EmbedLogin).Key, nil
+				})
+				if err == nil {
+					if claims, ok := token.Claims.(*MyClaims); ok && token.Valid {
+						//log.Println(claims.Username)
+						return claims
+					}
+				}
+				log.Println("login failed:", err)
+			}
+			return nil
+		}
 	}
 
 	res, err := gorestful.NewResource(
@@ -162,28 +194,10 @@ func loadRestApi(router *gin.Engine) {
 			return &models.Proxy{}
 		}),
 		gorestful.WithApiRouterGroup(router.Group("/api", func(c *gin.Context) {
-			if tokenString := c.Request.Header.Get(am.HeaderKey); tokenString != "" {
-				if len(am.HeaderValuePrefix) > 0 && strings.Contains(tokenString, am.HeaderValuePrefix) {
-					tokenString = strings.Split(tokenString, am.HeaderValuePrefix)[1]
-				}
-				token, err := jwt.ParseWithClaims(tokenString, &MyClaims{}, func(token *jwt.Token) (interface{}, error) {
-					// Don't forget to validate the alg is what you expect:
-					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-						return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-					}
-
-					// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-					return am.AuthMode.(*gorestful.EmbedLogin).Key, nil
-				})
-				if err == nil {
-					if claims, ok := token.Claims.(*MyClaims); ok && token.Valid {
-						log.Println(claims.Username)
-						c.Set(authUserKey, claims.Token)
-						c.Set(authUserId, claims.UID)
-						return
-					}
-				}
-				log.Println("login failed:", err)
+			if claims := userInfo(c); claims != nil {
+				c.Set(authUserKey, claims.Token)
+				c.Set(authUserId, claims.UID)
+				return
 			}
 
 			c.AbortWithStatusJSON(403, map[string]interface{}{

@@ -27,7 +27,7 @@ type Proxy struct {
 	Port            int                 `json:"port"`                                  //端口号
 	ProxyType       string              `json:"proxy_type"`                            //代理类型http/https/socks5/socks4
 	ProxyURL        string              `json:"proxy_url" gorm:"index:idx_url,unique"` //完整代理地址https://p.abc.com:1234
-	Country         string              `json:"country" gorm:"index:idx_url"`          //国家，二位码
+	Country         string              `json:"country"`                               //国家，二位码
 	Http            bool                `json:"http"`                                  //http代理可访问
 	Connect         bool                `json:"https"`                                 //https代理可访问
 	ProxyLevel      ProxyAnonymityLevel `json:"proxy_level"`                           //匿名级别

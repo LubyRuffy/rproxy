@@ -7,6 +7,6 @@ import (
 // User 用户表
 type User struct {
 	gorm.Model
-	Email string `json:"email"`
-	Token string `json:"token"`
+	Email string `json:"email" gorm:"uniqueIndex:idx_user,priority:1"`
+	Token string `json:"token" gorm:"uniqueIndex:idx_user,priority:2"`
 }

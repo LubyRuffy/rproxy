@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"github.com/LubyRuffy/gorestful"
 	"github.com/LubyRuffy/rproxy/models"
@@ -104,11 +103,7 @@ func loadRestApi(router *gin.Engine) {
 						return err
 					}
 
-					err = models.GetDB().Where(&user).Find(&user).Error
-					if err == nil && user.ID > 0 {
-						return errors.New("exists user")
-					}
-					err = models.GetDB().Model(&user).Save(&user).Error
+					err = models.GetDB().Model(&user).Create(&user).Error
 					return err
 				},
 				RouterGroup: router.Group("/"),

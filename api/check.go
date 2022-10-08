@@ -23,6 +23,16 @@ import (
 	"time"
 )
 
+// headerString http request 转换为字符串
+func headerString(r *http.Request) string {
+	var s string
+	s = fmt.Sprintf("%s %s %s\n", r.Method, r.RequestURI, r.Proto)
+	for k, v := range r.Header {
+		s += k + ": " + strings.Join(v, ",") + "\n"
+	}
+	return s
+}
+
 var (
 	once               sync.Once
 	myPublicIP         string // 公网ip，用于检查代理是否匿名
@@ -33,6 +43,11 @@ var (
 			Header string `json:"header"`
 			Ip     string `json:"ip"`
 		}
+
+		if resp.StatusCode != http.StatusOK {
+			return "", errors.New(headerString(resp.Request))
+		}
+
 		//body, err := ioutil.ReadAll(resp.Body)
 		//if err != nil {
 		//	return false, err

@@ -13,12 +13,16 @@ import (
 )
 
 func main() {
+	log.Println("version:", api.Version)
+
 	// 加载配置文件
 	viper.SetDefault("addr", ":8088")
 	viper.SetDefault("dbfile", "rproxy.sqlite")
 	viper.SetDefault("debug.dbsql", false)
 
 	pflag.Bool("auth", false, "enable auth")
+	pflag.String("addr", ":8088", "bind addr")
+	pflag.String("dbfile", "rproxy.sqlite", "sqlite database file")
 	pflag.Parse()
 	viper.BindPFlags(pflag.CommandLine)
 

@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// 连接数据库
-	_, err := models.SetupDB(fmt.Sprintf("%s?journal_mode=%s&busy_timeout=%s", viper.GetString("dbfile"), "WAL", "9999999"))
+	_, err := models.SetupDB(fmt.Sprintf("%s?cache=shared&_journal_mode=WAL&mode=rwc&_busy_timeout=9999999", viper.GetString("dbfile")))
 	if err != nil {
 		log.Println("connect db failed:", err)
 	}

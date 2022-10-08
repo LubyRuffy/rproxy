@@ -23,10 +23,10 @@ import (
 	"time"
 )
 
-// headerString http request 转换为字符串
-func headerString(r *http.Request) string {
+// headerString http response 转换为字符串
+func headerString(r *http.Response) string {
 	var s string
-	s = fmt.Sprintf("%s %s %s\n", r.Method, r.RequestURI, r.Proto)
+	s = fmt.Sprintf("%s %d %s\n", r.Proto, r.StatusCode, r.Status)
 	for k, v := range r.Header {
 		s += k + ": " + strings.Join(v, ",") + "\n"
 	}
@@ -45,7 +45,7 @@ var (
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			return "", errors.New(headerString(resp.Request))
+			return "", errors.New(headerString(resp))
 		}
 
 		//body, err := ioutil.ReadAll(resp.Body)
@@ -123,7 +123,7 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 		if err != nil {
 			errStr = err.Error()
 		}
-		models.GetDB().Save(&models.CheckLog{
+		models.GetDB().Create(&models.CheckLog{
 			ProxyType: protocol,
 			Host:      host,
 			Error:     errStr,
@@ -339,6 +339,13 @@ func insertProxyToDb(p *models.Proxy, uid uint) error {
 	var findProxy models.Proxy
 	if err := models.GetDB().Where(models.Proxy{ProxyURL: p.ProxyURL}).Find(&findProxy).Error; err == nil {
 		p.ID = findProxy.ID
+		p.CreatedAt = findProxy.CreatedAt
+		p.SuccessCount = findProxy.SuccessCount + 1
+		p.FailedCount = findProxy.FailedCount
+		p.LastError = findProxy.LastError
+		p.LastFailedTime = findProxy.LastFailedTime
+		p.LastSuccessTime.Time = time.Now()
+		p.LastSuccessTime.Valid = true
 	}
 
 	if err := models.GetDB().Where(models.Proxy{ProxyURL: p.ProxyURL}).Save(p).Error; err != nil {

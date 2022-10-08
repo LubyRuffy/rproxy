@@ -13,20 +13,26 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 var (
 	srv         *http.Server // http服务器
-	Version     = "v0.1.2"
+	Version     = "v0.1.3"
 	Prefix      = "/api"
 	authUserKey = "token"  // 存在context中的token主键
 	authUserId  = "userId" // 存在context中的token主键
+	lock        sync.Mutex // 写入锁
 
 	// TokenAuth 认证函数，可以覆盖
 	TokenAuth = func(c *gin.Context, token string) bool {
 		var user models.User
-		if err := models.GetDB().Find(&user, "token=?", token).Error; err == nil && user.ID > 0 {
-			log.Println(user.Email, "auth ok")
+		info := strings.Split(token, ":")
+		if len(info) < 2 {
+			return false // 格式不对
+		}
+		if err := models.GetDB().Find(&user, "email=? and token=?", info[0], info[1]).Error; err == nil && user.ID > 0 {
+			//log.Println(user.Email, "auth ok")
 			if c != nil {
 				c.Set(authUserKey, user.Email)
 				c.Set(authUserId, user.ID)
@@ -127,7 +133,7 @@ func loadRestApi(router *gin.Engine) {
 
 					var user models.User
 					if err := models.GetDB().Where(&checkUser).Find(&user).Error; err == nil && user.ID > 0 {
-						log.Println(user.Email, "auth ok")
+						//log.Println(user.Email, "auth ok")
 
 						t := jwt.NewWithClaims(jwt.SigningMethodHS512, MyClaims{
 							UID:      user.ID,

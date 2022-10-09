@@ -19,16 +19,19 @@ func main() {
 	viper.SetDefault("addr", ":8088")
 	viper.SetDefault("dbfile", "rproxy.sqlite")
 	viper.SetDefault("debug.dbsql", false)
+	viper.SetDefault("tls", false)
+
+	viper.AddConfigPath(filepath.Dir(os.Args[0]))
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")
 
 	pflag.Bool("auth", false, "enable auth")
+	pflag.Bool("tls", false, "enable tls")
 	pflag.String("addr", ":8088", "bind addr")
 	pflag.String("dbfile", "rproxy.sqlite", "sqlite database file")
 	pflag.Parse()
 	viper.BindPFlags(pflag.CommandLine)
 
-	viper.AddConfigPath(filepath.Dir(os.Args[0]))
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("config")
 	viper.Debug()
 	if err := viper.ReadInConfig(); err == nil {
 		log.Println("load config from file:", viper.ConfigFileUsed())

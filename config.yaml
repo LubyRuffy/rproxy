@@ -7,6 +7,9 @@ dbfile: rproxy.sqlite
 # 是否开启认证
 auth: true
 
+# 是否开启https
+#tls: true
+
 # 调试信息
 debug:
   gin: false

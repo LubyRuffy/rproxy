@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/kabukky/httpscerts"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
@@ -256,7 +257,17 @@ func Start(addr string) error {
 			}
 		}),
 	}
-	return srv.ListenAndServe()
+
+	var err error
+	if viper.GetBool("tls") {
+		if err = httpscerts.Generate("cert.pem", "key.pem", ""); err != nil {
+			panic(err)
+		}
+		err = srv.ListenAndServeTLS("cert.pem", "key.pem")
+	} else {
+		err = srv.ListenAndServe()
+	}
+	return err
 }
 
 // Stop 停止服务器

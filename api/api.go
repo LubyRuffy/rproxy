@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/LubyRuffy/gorestful"
 	"github.com/LubyRuffy/rproxy/models"
@@ -19,11 +20,29 @@ import (
 
 var (
 	srv         *http.Server // http服务器
-	Version     = "v0.1.3"
+	Version     = "v0.1.4"
 	Prefix      = "/api"
 	authUserKey = "token"  // 存在context中的token主键
 	authUserId  = "userId" // 存在context中的token主键
 	lock        sync.Mutex // 写入锁
+
+	authHeader = func(h http.Header) string {
+		authLine := h.Get("X-Rproxy-Token")
+		if authLine == "" {
+			pa := h.Get("Proxy-Authorization")
+			if pa == "" {
+				pa = h.Get("Authorization")
+			}
+			if strings.Contains(pa, " ") {
+				auth := strings.Split(pa, " ")
+				var up [100]byte
+				if n, err := base64.StdEncoding.Decode(up[:], []byte(auth[1])); err == nil {
+					authLine = string(up[:n]) // 天坑，必须要up[:n]的形式，不然后面的字符串就错了（看起来是一摸一样，实际内容不一样）
+				}
+			}
+		}
+		return authLine
+	}
 
 	// TokenAuth 认证函数，可以覆盖
 	TokenAuth = func(c *gin.Context, token string) bool {
@@ -32,7 +51,8 @@ var (
 		if len(info) < 2 {
 			return false // 格式不对
 		}
-		if err := models.GetDB().Find(&user, "email=? and token=?", info[0], info[1]).Error; err == nil && user.ID > 0 {
+		err := models.GetDB().Where(&models.User{Email: info[0], Token: info[1]}).Find(&user).Error
+		if err == nil && user.ID > 0 {
 			//log.Println(user.Email, "auth ok")
 			if c != nil {
 				c.Set(authUserKey, user.Email)
@@ -64,7 +84,7 @@ func statusHandler(c *gin.Context) {
 func agentTokenAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if viper.GetBool("auth") {
-			if authLine := c.Request.Header.Get("X-Rproxy-Token"); authLine != "" {
+			if authLine := authHeader(c.Request.Header); authLine != "" {
 				if len(authLine) > 0 && TokenAuth(c, authLine) {
 					return
 				}
@@ -172,7 +192,11 @@ func loadRestApi(router *gin.Engine) {
 				if err == nil {
 					if claims, ok := token.Claims.(*MyClaims); ok && token.Valid {
 						//log.Println(claims.Username)
-						return claims
+						var user models.User
+						if err = models.GetDB().Where(&models.User{Email: claims.Username, Token: claims.Token}).Find(&user).Error; err == nil && user.ID > 0 {
+							return claims
+						}
+						return nil
 					}
 				}
 				log.Println("login failed:", err)
@@ -233,7 +257,8 @@ func Start(addr string) error {
 	pprof.Register(router, "dev/pprof") // http pprof, default is "debug/pprof"
 	router.GET("/status", statusHandler)
 	router.GET("/check", checkHandler)
-	router.Any("/", proxyHandler)
+	router.Any("/", statusHandler)
+	//router.Any("/", proxyHandler)
 
 	v1 := router.Group(Prefix+"/v1", agentTokenAuth())
 	v1.GET("/me", meHandler)
@@ -250,11 +275,18 @@ func Start(addr string) error {
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			//if r.Method == http.MethodConnect {
 			if len(r.RequestURI) > 0 && r.RequestURI[0] != '/' {
-				//agentTokenAuth()(&gin.Context{Request: r})
-				proxyServeHTTP(w, r)
-			} else {
-				router.ServeHTTP(w, r)
+				if viper.GetBool("auth") {
+					authLine := authHeader(r.Header)
+					if authLine != "" {
+						if len(authLine) > 0 && TokenAuth(nil, authLine) {
+							proxyServeHTTP(w, r)
+							return
+						}
+					}
+				}
 			}
+
+			router.ServeHTTP(w, r)
 		}),
 	}
 

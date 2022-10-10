@@ -90,3 +90,8 @@ curl -x https://127.0.0.1:8088/ --proxy-user 'user:pass' --proxy-insecure http:/
 ```shell
 curl -x https://127.0.0.1:8088/ --proxy-user 'user:pass' --proxy-insecure http://ip.bmh.im -i --proxy-header "X-Rproxy-Filter: ip=1.1.1.1" -v
 ```
+
+### 循环测试
+```shell
+while true; do curl -x https://127.0.0.1:8088/ --proxy-insecure --proxy-user "user:pass" ip.bmh.im/g; echo ""; done
+```

@@ -3,7 +3,7 @@ module github.com/LubyRuffy/rproxy
 go 1.18
 
 require (
-	github.com/LubyRuffy/gorestful v0.0.0-20220928095052-2f2f8b4fdcdd
+	github.com/LubyRuffy/gorestful v0.0.0-20221011111254-91e41bdc4816
 	github.com/LubyRuffy/myip v0.0.0-20220808131427-cd1832923c09
 	github.com/elazarl/goproxy v0.0.0-20220529153421-8ea89ba92021
 	github.com/gin-contrib/pprof v1.4.0
@@ -16,7 +16,7 @@ require (
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.0
 	gorm.io/driver/sqlite v1.3.6
-	gorm.io/gorm v1.23.10
+	gorm.io/gorm v1.24.0
 	h12.io/socks v1.0.3
 )
 
@@ -48,9 +48,9 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/subosito/gotenv v1.3.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
-	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be // indirect
-	golang.org/x/net v0.0.0-20220927171203-f486391704dc // indirect
-	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
+	golang.org/x/crypto v0.0.0-20221010152910-d6f0a8c073c2 // indirect
+	golang.org/x/net v0.0.0-20221004154528-8021a29435af // indirect
+	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect

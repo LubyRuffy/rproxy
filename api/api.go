@@ -216,6 +216,21 @@ func loadRestApi(router *gin.Engine) {
 			panic("not valid user")
 			return models.GetDB().Model(&models.Proxy{})
 		}),
+		gorestful.WithQueryFunc(func(keyword string, q *gorm.DB, res *gorestful.Resource) *gorm.DB {
+			query := ""
+			var querySearch []interface{}
+			res.EachStringField(func(f gorestful.Field) {
+				if len(query) > 0 {
+					query += " or "
+				}
+				query += "proxies." + f.JsonName + " like ? "
+				querySearch = append(querySearch, "%"+keyword+"%")
+			})
+			if len(querySearch) == 0 {
+				return q
+			}
+			return q.Where(query, querySearch...)
+		}),
 		gorestful.WithUserStruct(func() interface{} {
 			return &models.Proxy{}
 		}),

@@ -17,6 +17,11 @@ if [[ $COMMENT == "" || $COMMENT == " " ]]; then
   exit
 fi
 
+# 先删除版本
+git tag -d "$VERSION"
+git push --delete origin  "$VERSION"
+
+# 再发布版本
 git tag -a "$VERSION" -m "$COMMENT"
 git push origin "$VERSION"
 goreleaser release --rm-dist --debug

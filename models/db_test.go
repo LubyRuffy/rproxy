@@ -1,9 +1,9 @@
 package models
 
 import (
+	"github.com/glebarez/sqlite"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"os"
@@ -50,7 +50,7 @@ func TestSetupDB(t *testing.T) {
 
 	// 再次打开表，会不会多次创建表结构？因为HasTable并没有实现
 	// 果然，会提示panic: SQL logic error: table "proxies" already exists (1) [recovered]
-	// 必须用"gorm.io/driver/sqlite"才可以
+	// 必须用"gorm.io/driver/sqlite"或者"github.com/glebarez/sqlite"才可以
 	d, err := GetDB().DB()
 	assert.Nil(t, err)
 	d.Close()

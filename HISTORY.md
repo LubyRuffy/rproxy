@@ -1,4 +1,4 @@
-## v0.1.5 
+## v0.1.5 only fetch user's proxies
 
 -   only fetch user's proxies
 -   remove auth config, every request must with auth token

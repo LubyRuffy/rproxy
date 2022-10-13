@@ -1,5 +1,5 @@
 /rproxy
-/*.sqlite
+/*.sqlite*
 /dbip-city-lite-*.mmdb
 /dist
 /*.pem

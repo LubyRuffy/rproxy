@@ -25,7 +25,6 @@ func main() {
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
 
-	pflag.Bool("auth", false, "enable auth")
 	pflag.Bool("tls", false, "enable tls")
 	pflag.String("addr", ":8088", "bind addr")
 	pflag.String("dbfile", "rproxy.sqlite", "sqlite database file")

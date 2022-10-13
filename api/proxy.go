@@ -20,27 +20,22 @@ var (
 	defaultTimeOut = time.Second * 15
 )
 
-func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
-	//if viper.GetBool("auth") {
-	//	if authLine := r.Header.Get("X-Rproxy-Token"); authLine != "" {
-	//		if len(authLine) == 0 || !TokenAuth(nil, authLine) {
-	//			w.WriteHeader(http.StatusForbidden)
-	//			return
-	//		}
-	//	}
-	//}
+func proxyServeHTTP(c *gin.Context) {
+	// 外部做好认证
 
-	db := models.GetDB()
+	db := models.GetDB().Model(&models.Proxy{}).
+		Joins("join user_proxies on user_proxies.proxy_id=proxies.id").
+		Where("user_proxies.proxy_id>0 and user_proxies.user_id=?", userId(c))
 	proxy := goproxy.NewProxyHttpServer()
 
-	if r.Method == http.MethodConnect {
+	if c.Request.Method == http.MethodConnect {
 		db = db.Where(&models.Proxy{Connect: true})
 	}
 
-	if filter := r.Header.Get("X-Rproxy-Filter"); len(filter) > 0 {
+	if filter := c.Request.Header.Get("X-Rproxy-Filter"); len(filter) > 0 {
 		v, err := url.ParseQuery(filter)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			c.Writer.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		for k, vs := range v {
@@ -55,22 +50,22 @@ func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		r.Header.Del("X-Rproxy-Filter")
+		c.Request.Header.Del("X-Rproxy-Filter")
 	}
 
 	// 每次取三条测试
 	var ps []models.Proxy
 	limit := 3 // default limit is 3
-	if v := r.Header.Get("X-Rproxy-Limit"); len(v) > 0 {
+	if v := c.Request.Header.Get("X-Rproxy-Limit"); len(v) > 0 {
 		if vl, err := strconv.Atoi(v); err == nil && vl > 0 {
 			limit = vl
 		}
-		r.Header.Del("X-Rproxy-Limit")
+		c.Request.Header.Del("X-Rproxy-Limit")
 	}
 
 	if err := db.Order("RANDOM()").Limit(limit).Find(&ps).Error; err != nil || len(ps) == 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("no alive proxy"))
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		c.Writer.Write([]byte("no alive proxy"))
 		return
 	}
 
@@ -80,7 +75,7 @@ func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var signLock sync.Mutex
 	for _, p := range ps {
 		go func(p models.Proxy) {
-			log.Printf("fetch %s from %s", r.RequestURI, p.ProxyURL)
+			log.Printf("fetch %s from %s", c.Request.RequestURI, p.ProxyURL)
 
 			var conn net.Conn
 			var err error
@@ -113,10 +108,10 @@ func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-c.Request.Context().Done():
 		return
 	case p := <-ch:
-		if r.Method == http.MethodConnect {
+		if c.Request.Method == http.MethodConnect {
 			proxy.ConnectDial = proxy.NewConnectDialToProxy(p.ProxyURL)
 		} else {
 			if p.ProxyType == "socks4" {
@@ -132,84 +127,10 @@ func proxyServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		}
 	case <-time.After(defaultTimeOut):
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("no alive proxy"))
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		c.Writer.Write([]byte("no alive proxy"))
 		return
 	}
 
-	//dialFn := func(ctx context.Context, network, addr string) (net.Conn, error) {
-	//	ch := make(chan net.Conn, 1)
-	//	hasSign := false
-	//	var signLock sync.Mutex
-	//	for _, p := range ps {
-	//		go func(p models.Proxy) {
-	//			log.Printf("fetch %s from %s", r.RequestURI, p.ProxyURL)
-	//
-	//			var conn net.Conn
-	//			var err error
-	//
-	//			switch p.ProxyType {
-	//			case "socks5", "socks4":
-	//				conn, err = socks.Dial(p.ProxyURL)(network, addr)
-	//			case "http", "https":
-	//				if r.Method == http.MethodConnect {
-	//					conn, err = proxy.NewConnectDialToProxy(p.ProxyURL)(network, addr)
-	//				} else {
-	//					conn, err = net.Dial(network, fmt.Sprintf("%s:%d", p.IP, p.Port))
-	//				}
-	//			}
-	//
-	//			if err != nil {
-	//				p.FailedCount++
-	//				p.LastFailedTime.Time = time.Now()
-	//				p.LastFailedTime.Valid = true
-	//				p.LastError = err.Error()
-	//				models.GetDB().Save(&p)
-	//				return
-	//			}
-	//
-	//			if !hasSign {
-	//				signLock.Lock()
-	//				hasSign = true
-	//				signLock.Unlock()
-	//				ch <- conn
-	//				p.SuccessCount++
-	//				p.LastSuccessTime.Time = time.Now()
-	//				p.LastSuccessTime.Valid = true
-	//				models.GetDB().Save(&p)
-	//			}
-	//		}(p)
-	//	}
-	//
-	//	select {
-	//	case <-ctx.Done():
-	//		return nil, errors.New("context done")
-	//	case conn := <-ch:
-	//		return conn, nil
-	//	case <-time.After(defaultTimeOut):
-	//	}
-	//	return nil, errors.New("no alive proxy")
-	//}
-	//
-	//proxy.ConnectDial = func(network string, addr string) (net.Conn, error) {
-	//	return dialFn(context.Background(), network, addr)
-	//}
-	//proxy.Tr.DialContext = dialFn
-
-	//proxy.OnRequest().DoFunc(func(req *http.Request, pctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-	//	log.Println(req.URL, req.RequestURI)
-	//	return req, nil
-	//})
-	//
-	//proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-	//	if resp != nil {
-	//		log.Println(resp.StatusCode, resp.Request.URL, resp.Request.RequestURI)
-	//	}
-	//	return resp
-	//})
-	proxy.ServeHTTP(w, r)
-}
-
-func proxyHandler(c *gin.Context) {
-	proxyServeHTTP(c.Writer, c.Request)
+	proxy.ServeHTTP(c.Writer, c.Request)
 }

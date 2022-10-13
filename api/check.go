@@ -38,14 +38,14 @@ var (
 	myPublicIP         string // 公网ip，用于检查代理是否匿名
 	defaultCheckUrl    = "http://ip.bmh.im/h"
 	defaultCheckHeader = "Rproxy"
-	defaultCheckFunc   = func(resp *http.Response) (header string, err error) {
+	defaultCheckFunc   = func(resp *http.Response) (header string, ip string, err error) {
 		var r struct {
 			Header string `json:"header"`
 			Ip     string `json:"ip"`
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			return "", errors.New(headerString(resp))
+			return "", "", errors.New(headerString(resp))
 		}
 
 		//body, err := ioutil.ReadAll(resp.Body)
@@ -58,7 +58,7 @@ var (
 		}
 
 		if strings.Contains(r.Header, defaultCheckHeader) {
-			return r.Header, nil
+			return r.Header, r.Ip, nil
 		}
 
 		return
@@ -113,6 +113,7 @@ type proxyResult struct {
 	Error  error
 	Header http.Header
 	Url    string
+	IP     string
 }
 
 // checkProtocolHost 第一个返回参数是是否为代理，第二个返回参数是返回的header
@@ -151,7 +152,8 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 			defer resp.Body.Close()
 
 			var header string
-			header, err = defaultCheckFunc(resp)
+			var ip string
+			header, ip, err = defaultCheckFunc(resp)
 			if err != nil {
 				log.Println("check host failed, host:", host, ", decode err:", err)
 				return &proxyResult{Error: err}
@@ -160,6 +162,7 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 				return &proxyResult{
 					Valid:  true,
 					Header: resp.Header.Clone(),
+					IP:     ip,
 					Cost:   cost,
 					Url:    fmt.Sprintf("%s://%s", protocol, host),
 				}
@@ -297,11 +300,13 @@ func checkProxyOfUrl(u string, checkResult *proxyResult) *models.Proxy {
 
 	return &models.Proxy{
 		IP:           uParsed.Hostname(),
+		OutIP:        checkResult.IP,
 		Port:         port,
 		ProxyType:    uParsed.Scheme,
 		ProxyURL:     u,
 		Http:         true,
 		Connect:      supportConnect,
+		IPv6:         strings.Count(checkResult.IP, ":") >= 2,
 		Country:      country,
 		ProxyLevel:   proxyLevel,
 		Latency:      checkResult.Cost.Milliseconds(),

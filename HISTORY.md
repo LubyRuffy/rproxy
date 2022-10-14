@@ -3,6 +3,7 @@
 -   support check cache
 -   optimize check?host= as concurrent, send to background
 -   support load exists cert firstly when tls enabled
+-   add default timeout
 
 ## v0.1.5 only fetch user's proxies
 

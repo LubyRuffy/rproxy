@@ -88,25 +88,33 @@ type TransportFunc func(addr string) *http.Transport
 var Transports = map[string]TransportFunc{
 	"http": func(addr string) *http.Transport {
 		u, _ := url.Parse("http://" + addr)
-		return &http.Transport{Proxy: http.ProxyURL(u), TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		return &http.Transport{
+			Proxy: http.ProxyURL(u),
+		}
 	},
 	"https": func(addr string) *http.Transport {
 		u, _ := url.Parse("https://" + addr)
-		return &http.Transport{Proxy: http.ProxyURL(u), TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		return &http.Transport{
+			Proxy: http.ProxyURL(u),
+		}
 	},
 	"socks4": func(addr string) *http.Transport {
 		return &http.Transport{DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return socks.Dial("socks4://"+addr)("socks4", addr)
-		}, TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		},
+		}
 	},
 	"socks4a": func(addr string) *http.Transport {
 		return &http.Transport{DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return socks.Dial("socks4a://"+addr)("socks4a", addr)
-		}, TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		},
+		}
 	},
 	"socks5": func(addr string) *http.Transport {
 		u, _ := url.Parse("socks5://" + addr)
-		return &http.Transport{Proxy: http.ProxyURL(u), TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+		return &http.Transport{
+			Proxy: http.ProxyURL(u),
+		}
 	},
 }
 
@@ -117,6 +125,18 @@ type proxyResult struct {
 	Header http.Header
 	Url    string
 	IP     string
+}
+
+func defaultHttpClient(tr *http.Transport) *http.Client {
+	tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	tr.TLSHandshakeTimeout = defaultTimeOut
+	tr.ResponseHeaderTimeout = defaultTimeOut
+	tr.IdleConnTimeout = defaultTimeOut
+	tr.ExpectContinueTimeout = defaultTimeOut
+	return &http.Client{
+		Transport: tr,
+		Timeout:   defaultTimeOut,
+	}
 }
 
 // checkProtocolHost 第一个返回参数是是否为代理，第二个返回参数是返回的header
@@ -143,9 +163,7 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 	}()
 
 	if transportFunc, ok := Transports[protocol]; ok {
-		client := http.Client{
-			Transport: transportFunc(host),
-		}
+		client := defaultHttpClient(transportFunc(host))
 
 		var req *http.Request
 		req, err = http.NewRequest("GET", defaultCheckUrl, nil)
@@ -236,9 +254,7 @@ func checkIpPort(ip string, port string) *proxyResult {
 func supportHttps(uParsed *url.URL) bool {
 	var err error
 	if transportFunc, ok := Transports[uParsed.Scheme]; ok {
-		client := http.Client{
-			Transport: transportFunc(uParsed.Host),
-		}
+		client := defaultHttpClient(transportFunc(uParsed.Host))
 
 		var resp *http.Response
 		resp, err = client.Get(defaultHTTPsCheckUrl)

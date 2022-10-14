@@ -20,7 +20,7 @@ import (
 
 var (
 	srv         *http.Server // http服务器
-	Version     = "v0.1.5"
+	Version     = "v0.1.6"
 	Prefix      = "/api"
 	authUserKey = "token"  // 存在context中的token主键
 	authUserId  = "userId" // 存在context中的token主键
@@ -224,6 +224,14 @@ func loadRestApi(router *gin.Engine) {
 			}
 			return q.Where(query, querySearch...)
 		}),
+		gorestful.WithDeleteFunc(func(id interface{}, res *gorestful.Resource, c *gin.Context) error {
+			err := models.GetDB().Unscoped().Where("proxy_id=? and user_id=?", id, userId(c)).Delete(&models.UserProxy{}).Error
+			if err != nil {
+				return fmt.Errorf("delete failed: %v", err)
+			}
+
+			return nil
+		}),
 		gorestful.WithUserStruct(func() interface{} {
 			return &models.Proxy{}
 		}),
@@ -294,8 +302,11 @@ func Start(addr string) error {
 
 	var err error
 	if viper.GetBool("tls") {
-		if err = httpscerts.Generate("cert.pem", "key.pem", ""); err != nil {
-			panic(err)
+		err = router.RunTLS(addr, "cert.pem", "key.pem")
+		if err != nil {
+			if err = httpscerts.Generate("cert.pem", "key.pem", ""); err != nil {
+				panic(err)
+			}
 		}
 		err = router.RunTLS(addr, "cert.pem", "key.pem")
 	} else {

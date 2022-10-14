@@ -3,7 +3,7 @@ module github.com/LubyRuffy/rproxy
 go 1.18
 
 require (
-	github.com/LubyRuffy/gorestful v0.0.0-20221013111114-b399fdf7b76e
+	github.com/LubyRuffy/gorestful v0.0.0-20221014061004-7e3441c69ae5
 	github.com/LubyRuffy/myip v0.0.0-20220808131427-cd1832923c09
 	github.com/elazarl/goproxy v0.0.0-20220529153421-8ea89ba92021
 	github.com/gin-contrib/pprof v1.4.0
@@ -13,6 +13,7 @@ require (
 	github.com/jinzhu/gorm v1.9.16
 	github.com/kabukky/httpscerts v0.0.0-20150320125433-617593d7dcb3
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.0
@@ -52,7 +53,7 @@ require (
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	golang.org/x/crypto v0.0.0-20221012134737-56aed061732a // indirect
 	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458 // indirect
-	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
+	golang.org/x/sys v0.0.0-20221013171732-95e765b1cc43 // indirect
 	golang.org/x/text v0.3.8 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect

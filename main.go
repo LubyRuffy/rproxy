@@ -36,8 +36,8 @@ func main() {
 		log.Println("load config from file:", viper.ConfigFileUsed())
 	}
 
-	// 连接数据库
-	_, err := models.SetupDB(fmt.Sprintf("%s?cache=shared&_journal_mode=WAL&mode=rwc&_busy_timeout=9999999", viper.GetString("dbfile")))
+	// 连接数据库， 	cache=shared&_journal_mode=WAL&mode=rwc&_busy_timeout=9999999
+	_, err := models.SetupDB(fmt.Sprintf("%s?cache=shared&mode=rwc&_pragma=journal_mode(WAL)&_pragma=cache(shared)&_pragma=mode(rwc)&_pragma=busy_timeout(9999999)", viper.GetString("dbfile")))
 	if err != nil {
 		log.Println("connect db failed:", err)
 	}

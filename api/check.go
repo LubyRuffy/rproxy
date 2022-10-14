@@ -9,6 +9,7 @@ import (
 	"github.com/LubyRuffy/myip/ipdb"
 	"github.com/LubyRuffy/rproxy/models"
 	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
 	"gorm.io/gorm/clause"
 	"h12.io/socks"
 	"io/ioutil"
@@ -75,6 +76,8 @@ var (
 		}
 		return false
 	}
+
+	globalCache = cache.New(1*time.Hour, 10*time.Minute) // 全局缓存
 )
 
 // TransportFunc takes an address to a proxy server and returns a fully
@@ -118,6 +121,14 @@ type proxyResult struct {
 
 // checkProtocolHost 第一个返回参数是是否为代理，第二个返回参数是返回的header
 func checkProtocolHost(protocol string, host string) *proxyResult {
+	// 确定最近没有进行测试
+	id := protocol + "://" + host
+	if _, found := globalCache.Get(id); found {
+		return nil
+	} else {
+		globalCache.Set(id, true, cache.DefaultExpiration)
+	}
+
 	var err error
 	defer func() {
 		errStr := ""
@@ -208,7 +219,7 @@ func checkHost(host string) *proxyResult {
 			"https",
 			//"socks4",
 		} {
-			if p := checkProtocolHost(protocol, host); p.Valid {
+			if p := checkProtocolHost(protocol, host); p != nil && p.Valid {
 				return p
 			}
 		}
@@ -405,13 +416,21 @@ func checkHandler(c *gin.Context) {
 			}
 		} else {
 			// ?host=1.1.1.1:80
-			if checkResult = checkHost(host); checkResult == nil || !checkResult.Valid {
-				c.JSON(200, map[string]interface{}{
-					"code":    500,
-					"message": fmt.Sprintf("not valid proxy of host: %s", host),
-				})
-				return
-			}
+
+			// 遍历协议时间比较长，都放到后台进行
+			go func() {
+				if checkResult = checkHost(host); checkResult == nil || !checkResult.Valid {
+					return
+				}
+				go fillProxyField(checkResult.Url, checkResult, userId(c))
+			}()
+
+			// 直接返回成功提示
+			c.JSON(200, map[string]interface{}{
+				"code": 200,
+				"data": "submit ok, process in the background",
+			})
+			return
 
 		}
 		proxyUrl = checkResult.Url

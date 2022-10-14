@@ -209,7 +209,7 @@ func checkHost(host string) *proxyResult {
 		return checkProtocolHost("http", host+":80")
 	}
 	if strings.Contains(host, "443") {
-		if p := checkProtocolHost("https", host); p.Valid {
+		if p := checkProtocolHost("https", host); p != nil && p.Valid {
 			return p
 		}
 	} else {

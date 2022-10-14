@@ -270,6 +270,11 @@ func defaultHandler(c *gin.Context) {
 		}
 	}
 
+	if c.Request.URL.Path == "/" {
+		statusHandler(c)
+		return
+	}
+
 	gin.Default().ServeHTTP(c.Writer, c.Request)
 }
 
@@ -289,7 +294,7 @@ func Start(addr string) error {
 	pprof.Register(router, "dev/pprof") // http pprof, default is "debug/pprof"
 	router.GET("/status", statusHandler)
 	router.GET("/check", checkHandler)
-	router.Any("/", statusHandler)
+	//router.Any("/", statusHandler)
 
 	v1 := router.Group(Prefix+"/v1", agentTokenAuth())
 	v1.GET("/me", meHandler)

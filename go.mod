@@ -6,6 +6,7 @@ require (
 	github.com/LubyRuffy/gorestful v0.0.0-20221014061004-7e3441c69ae5
 	github.com/LubyRuffy/myip v0.0.0-20220808131427-cd1832923c09
 	github.com/elazarl/goproxy v0.0.0-20220529153421-8ea89ba92021
+	github.com/gammazero/workerpool v1.1.3
 	github.com/gin-contrib/pprof v1.4.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/glebarez/sqlite v1.5.0
@@ -25,7 +26,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gammazero/deque v0.2.0 // indirect
-	github.com/gammazero/workerpool v1.1.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/glebarez/go-sqlite v1.19.1 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect

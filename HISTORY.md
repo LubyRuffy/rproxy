@@ -4,6 +4,7 @@
 -   optimize check?host= as concurrent, send to background
 -   support load exists cert firstly when tls enabled
 -   add default timeout
+-   add worker pool
 
 ## v0.1.5 only fetch user's proxies
 

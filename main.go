@@ -5,12 +5,17 @@ import (
 	"github.com/LubyRuffy/myip/ipdb"
 	"github.com/LubyRuffy/rproxy/api"
 	"github.com/LubyRuffy/rproxy/models"
+	"github.com/LubyRuffy/rproxy/utils"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"log"
 	"os"
 	"path/filepath"
 )
+
+func init() {
+	utils.CheckAndSetUlimit()
+}
 
 func main() {
 	log.Println("version:", api.Version)

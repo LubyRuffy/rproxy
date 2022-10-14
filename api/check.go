@@ -150,17 +150,17 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 	}
 
 	var err error
-	defer func() {
-		errStr := ""
-		if err != nil {
-			errStr = err.Error()
-		}
-		models.GetDB().Create(&models.CheckLog{
-			ProxyType: protocol,
-			Host:      host,
-			Error:     errStr,
-		})
-	}()
+	//defer func() {
+	//	errStr := ""
+	//	if err != nil {
+	//		errStr = err.Error()
+	//	}
+	//	models.GetDB().Create(&models.CheckLog{
+	//		ProxyType: protocol,
+	//		Host:      host,
+	//		Error:     errStr,
+	//	})
+	//}()
 
 	if transportFunc, ok := Transports[protocol]; ok {
 		client := defaultHttpClient(transportFunc(host))
@@ -223,6 +223,9 @@ func checkUrl(u string) *proxyResult {
 
 // checkHost 第一个返回是代理的完整url，第二个返回是header
 func checkHost(host string) *proxyResult {
+	if host == "" {
+		return nil
+	}
 	if !strings.Contains(host, ":") {
 		return checkProtocolHost("http", host+":80")
 	}
@@ -269,8 +272,8 @@ func supportHttps(uParsed *url.URL) bool {
 }
 
 // checkProxyOfUrl 检查代理的一些属性
-func checkProxyOfUrl(u string, checkResult *proxyResult) *models.Proxy {
-	uParsed, err := url.Parse(u)
+func checkProxyOfUrl(checkResult *proxyResult) *models.Proxy {
+	uParsed, err := url.Parse(checkResult.Url)
 	port := -1
 	if portStr := uParsed.Port(); len(portStr) > 0 {
 		port, err = strconv.Atoi(portStr)
@@ -330,7 +333,7 @@ func checkProxyOfUrl(u string, checkResult *proxyResult) *models.Proxy {
 		OutIP:        checkResult.IP,
 		Port:         port,
 		ProxyType:    uParsed.Scheme,
-		ProxyURL:     u,
+		ProxyURL:     checkResult.Url,
 		Http:         true,
 		Connect:      supportConnect,
 		IPv6:         strings.Count(checkResult.IP, ":") >= 2,
@@ -398,21 +401,28 @@ func insertProxyToDb(p *models.Proxy, uid uint) error {
 }
 
 // fillProxyField 填充代理属性
-func fillProxyField(proxyUrl string, checkResult *proxyResult, uid uint) {
-	p := checkProxyOfUrl(proxyUrl, checkResult)
+func fillProxyField(checkResult *proxyResult, uid uint) {
+	p := checkProxyOfUrl(checkResult)
 	if p == nil {
 		return
 	}
 
 	if err := insertProxyToDb(p, uid); err != nil {
-		log.Println("[WARNING] save user proxy failed, url:", proxyUrl, ", err:", err)
+		log.Println("[WARNING] save user proxy failed, url:", checkResult.Url, ", err:", err)
 	}
 }
 
+func checkHostAndInsertDB(host string, uid uint) {
+	checkResult := checkHost(host)
+	if checkResult == nil || !checkResult.Valid {
+		return
+	}
+	fillProxyField(checkResult, uid)
+}
+
 func checkHandler(c *gin.Context) {
-	var proxyUrl string
 	var checkResult *proxyResult
-	if proxyUrl = c.Query("url"); len(proxyUrl) > 0 {
+	if proxyUrl := c.Query("url"); len(proxyUrl) > 0 {
 		// ?url=https://1.1.1.1:443
 		if checkResult = checkUrl(proxyUrl); checkResult == nil || !checkResult.Valid {
 			c.JSON(200, map[string]interface{}{
@@ -434,12 +444,12 @@ func checkHandler(c *gin.Context) {
 			// ?host=1.1.1.1:80
 
 			// 遍历协议时间比较长，都放到后台进行
-			go func() {
-				if checkResult = checkHost(host); checkResult == nil || !checkResult.Valid {
-					return
-				}
-				go fillProxyField(checkResult.Url, checkResult, userId(c))
-			}()
+			for i := 0; i < 3 && wp.WaitingQueueSize() > wp.Size(); i++ {
+				time.Sleep(time.Second)
+			}
+			wp.Submit(func() {
+				checkHostAndInsertDB(host, userId(c))
+			})
 
 			// 直接返回成功提示
 			c.JSON(200, map[string]interface{}{
@@ -449,8 +459,6 @@ func checkHandler(c *gin.Context) {
 			return
 
 		}
-		proxyUrl = checkResult.Url
-
 	} else if port := c.Query("port"); len(port) > 0 {
 		// ?ip=1.1.1.1&port=80
 		ip := c.Query("ip")
@@ -461,19 +469,20 @@ func checkHandler(c *gin.Context) {
 			})
 			return
 		}
-		proxyUrl = checkResult.Url
 	} else {
 		c.JSON(500, errors.New("param failed"))
 		return
 	}
 
-	if proxyUrl == "" {
+	if checkResult == nil || checkResult.Url == "" {
 		c.JSON(500, errors.New("not proxy"))
 		return
 	}
 
 	// 只要是代理，就返回ok，其他属性放到后台执行
-	go fillProxyField(proxyUrl, checkResult, userId(c))
+	wp.Submit(func() {
+		fillProxyField(checkResult, userId(c))
+	})
 
 	c.JSON(200, map[string]interface{}{
 		"code": 200,

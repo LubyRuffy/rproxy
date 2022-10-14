@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/LubyRuffy/gorestful"
 	"github.com/LubyRuffy/rproxy/models"
+	"github.com/gammazero/workerpool"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -61,6 +62,8 @@ var (
 		}
 		return false
 	}
+
+	wp = workerpool.New(50)
 )
 
 // userId 获取当前登录的user id
@@ -322,5 +325,6 @@ func Start(addr string) error {
 
 // Stop 停止服务器
 func Stop() error {
+	wp.StopWait()
 	return srv.Close()
 }

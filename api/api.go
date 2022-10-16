@@ -258,6 +258,15 @@ func loadRestApi(router *gin.Engine) {
 	if err != nil {
 		panic(err)
 	}
+
+	// 替换字段
+	res.SetEnumField("ProxyLevel", [][]interface{}{
+		{models.ProxyAnonymityUnknown, "Unknown"},
+		{models.ProxyAnonymityElite, "Elite"},
+		{models.ProxyAnonymityAnonymous, "Anonymous"},
+		{models.ProxyAnonymityTransparent, "Transparent"},
+	})
+
 	gorestful.AddResourceApiPageToGin(res)
 }
 

@@ -3,7 +3,7 @@ module github.com/LubyRuffy/rproxy
 go 1.18
 
 require (
-	github.com/LubyRuffy/gorestful v0.0.0-20221014061004-7e3441c69ae5
+	github.com/LubyRuffy/gorestful v0.0.0-20221016124020-540a7f24139f
 	github.com/LubyRuffy/myip v0.0.0-20220808131427-cd1832923c09
 	github.com/elazarl/goproxy v0.0.0-20220529153421-8ea89ba92021
 	github.com/gammazero/workerpool v1.1.3
@@ -54,7 +54,7 @@ require (
 	github.com/subosito/gotenv v1.3.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	golang.org/x/crypto v0.0.0-20221012134737-56aed061732a // indirect
-	golang.org/x/net v0.0.0-20221012135044-0b7e1fb9d458 // indirect
+	golang.org/x/net v0.0.0-20221014081412-f15817d10f9b // indirect
 	golang.org/x/sys v0.0.0-20221013171732-95e765b1cc43 // indirect
 	golang.org/x/text v0.3.8 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect

@@ -35,6 +35,8 @@ func headerString(r *http.Response) string {
 }
 
 var (
+	EnableErrorCheckLog bool // 是否启用错误日志：在检查失败的情况下也记录日志
+
 	once               sync.Once
 	myPublicIP         string // 公网ip，用于检查代理是否匿名
 	defaultCheckUrl    = "http://ip.bmh.im/h"
@@ -150,17 +152,20 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 	}
 
 	var err error
-	//defer func() {
-	//	errStr := ""
-	//	if err != nil {
-	//		errStr = err.Error()
-	//	}
-	//	models.GetDB().Create(&models.CheckLog{
-	//		ProxyType: protocol,
-	//		Host:      host,
-	//		Error:     errStr,
-	//	})
-	//}()
+	defer func() {
+		if EnableErrorCheckLog {
+			errStr := ""
+			if err != nil {
+				errStr = err.Error()
+			}
+			models.GetDB().Create(&models.CheckLog{
+				ProxyType: protocol,
+				Host:      host,
+				Error:     errStr,
+			})
+		}
+
+	}()
 
 	if transportFunc, ok := Transports[protocol]; ok {
 		client := defaultHttpClient(transportFunc(host))

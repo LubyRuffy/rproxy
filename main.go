@@ -25,12 +25,14 @@ func main() {
 	viper.SetDefault("dbfile", "rproxy.sqlite")
 	viper.SetDefault("debug.dbsql", false)
 	viper.SetDefault("tls", false)
+	viper.SetDefault("logerror", false)
 
 	viper.AddConfigPath(filepath.Dir(os.Args[0]))
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
 
 	pflag.Bool("tls", false, "enable tls")
+	pflag.Bool("logerror", false, "enable error check log")
 	pflag.String("addr", ":8088", "bind addr")
 	pflag.String("dbfile", "rproxy.sqlite", "sqlite database file")
 	pflag.Parse()
@@ -49,6 +51,16 @@ func main() {
 
 	// 检查数据库
 	go ipdb.UpdateIpDatabase()
+
+	if viper.GetBool("logerror") {
+		api.EnableErrorCheckLog = true // 打开proxy检查错误的日志记录
+	}
+	if viper.GetBool("tls") {
+		api.EnableTls = true
+	}
+	if viper.GetBool("debug.gin") {
+		api.EnableDebug = true
+	}
 
 	// 启动web
 	if err = api.Start(viper.GetString("addr")); err != nil {

@@ -11,7 +11,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/kabukky/httpscerts"
 	"github.com/mitchellh/mapstructure"
-	"github.com/spf13/viper"
 	"gorm.io/gorm"
 	"log"
 	"net/http"
@@ -20,6 +19,9 @@ import (
 )
 
 var (
+	EnableTls   bool // 启动tls开关
+	EnableDebug bool // 启动debug开关
+
 	srv         *http.Server // http服务器
 	Version     = "v0.1.6"
 	Prefix      = "/api"
@@ -291,7 +293,7 @@ func defaultHandler(c *gin.Context) {
 }
 
 func Start(addr string) error {
-	if viper.GetBool("debug.gin") {
+	if EnableDebug {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
@@ -318,7 +320,7 @@ func Start(addr string) error {
 	log.Println("api server listened at:", addr)
 
 	var err error
-	if viper.GetBool("tls") {
+	if EnableTls {
 		err = router.RunTLS(addr, "cert.pem", "key.pem")
 		if err != nil {
 			if err = httpscerts.Generate("cert.pem", "key.pem", ""); err != nil {

@@ -34,6 +34,13 @@ func headerString(r *http.Response) string {
 	return s
 }
 
+type respStruct struct {
+	Header   string                 `json:"header"`
+	Ip       string                 `json:"ip"`
+	Upstream string                 `json:"upstream"`
+	Geo      map[string]interface{} `json:"geo"`
+}
+
 var (
 	EnableErrorCheckLog bool // 是否启用错误日志：在检查失败的情况下也记录日志
 
@@ -41,27 +48,18 @@ var (
 	myPublicIP         string // 公网ip，用于检查代理是否匿名
 	defaultCheckUrl    = "http://ip.bmh.im/h"
 	defaultCheckHeader = "Rproxy"
-	defaultCheckFunc   = func(resp *http.Response) (header string, ip string, err error) {
-		var r struct {
-			Header string `json:"header"`
-			Ip     string `json:"ip"`
-		}
-
+	defaultCheckFunc   = func(resp *http.Response) (r interface{}, err error) {
+		var rs respStruct
 		if resp.StatusCode != http.StatusOK {
-			return "", "", errors.New(headerString(resp))
+			return nil, errors.New(headerString(resp))
 		}
 
-		//body, err := ioutil.ReadAll(resp.Body)
-		//if err != nil {
-		//	return false, err
-		//}
-		//log.Println(string(body))
-		if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		if err = json.NewDecoder(resp.Body).Decode(&rs); err != nil {
 			return
 		}
 
-		if strings.Contains(r.Header, defaultCheckHeader) {
-			return r.Header, r.Ip, nil
+		if strings.Contains(rs.Header, defaultCheckHeader) {
+			return &rs, nil
 		}
 
 		return
@@ -121,12 +119,14 @@ var Transports = map[string]TransportFunc{
 }
 
 type proxyResult struct {
-	Valid  bool
-	Cost   time.Duration
-	Error  error
-	Header http.Header
-	Url    string
-	IP     string
+	Valid    bool
+	Cost     time.Duration
+	Error    error
+	Header   http.Header
+	Url      string
+	IP       string
+	Upstream string
+	Geo      map[string]interface{}
 }
 
 func defaultHttpClient(tr *http.Transport) *http.Client {
@@ -185,20 +185,21 @@ func checkProtocolHost(protocol string, host string) *proxyResult {
 			cost := time.Since(startTime)
 			defer resp.Body.Close()
 
-			var header string
-			var ip string
-			header, ip, err = defaultCheckFunc(resp)
+			var rs interface{}
+			rs, err = defaultCheckFunc(resp)
 			if err != nil {
 				log.Println("check host failed, host:", host, ", decode err:", err)
 				return &proxyResult{Error: err}
 			}
-			if len(header) > 0 {
+			if len(rs.(*respStruct).Ip) > 0 {
 				return &proxyResult{
-					Valid:  true,
-					Header: resp.Header.Clone(),
-					IP:     ip,
-					Cost:   cost,
-					Url:    fmt.Sprintf("%s://%s", protocol, host),
+					Valid:    true,
+					Header:   resp.Header.Clone(),
+					IP:       rs.(*respStruct).Ip,
+					Geo:      rs.(*respStruct).Geo,
+					Upstream: rs.(*respStruct).Upstream,
+					Cost:     cost,
+					Url:      fmt.Sprintf("%s://%s", protocol, host),
 				}
 			}
 		}
@@ -302,14 +303,19 @@ func checkProxyOfUrl(checkResult *proxyResult) *models.Proxy {
 	for _, key := range []string{"Via", "X-Forwarded-For", "X-RealIP", "X-RealIp"} {
 		if v := checkResult.Header.Get(key); len(v) > 0 {
 			proxyLevel = models.ProxyAnonymityAnonymous
+			break
 		}
 	}
 	for key := range checkResult.Header {
 		if v := checkResult.Header.Get(key); len(v) > 0 {
 			if strings.Contains(v, myPublicIP) {
 				proxyLevel = models.ProxyAnonymityTransparent
+				break
 			}
 		}
+	}
+	if checkResult.Upstream == myPublicIP {
+		proxyLevel = models.ProxyAnonymityTransparent
 	}
 
 	// 是否支持connect
@@ -318,9 +324,9 @@ func checkProxyOfUrl(checkResult *proxyResult) *models.Proxy {
 	// country
 	country := ""
 	if ipdb.Get() != nil {
-		ip := net.ParseIP(uParsed.Host)
+		ip := net.ParseIP(checkResult.IP)
 		if ip == nil {
-			ips, err := net.LookupIP(uParsed.Host)
+			ips, err := net.LookupIP(uParsed.Hostname())
 			if err == nil && len(ips) > 0 {
 				ip = ips[0]
 			}
@@ -331,6 +337,11 @@ func checkProxyOfUrl(checkResult *proxyResult) *models.Proxy {
 				country = city.Country.IsoCode
 			}
 		}
+	} else if checkResult.Geo != nil {
+		if v, ok := checkResult.Geo["country"]; ok {
+			country = v.(string)
+		}
+
 	}
 
 	return &models.Proxy{

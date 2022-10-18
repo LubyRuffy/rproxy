@@ -1,3 +1,9 @@
+## v0.1.7 support cache
+
+-   use out ip to query country
+-   query country failed then use myip's country name
+-   fixed bug of checking proxy level 
+
 ## v0.1.6 support cache
 
 -   support check cache

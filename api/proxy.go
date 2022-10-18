@@ -123,8 +123,16 @@ func proxyServeHTTP(c *gin.Context) {
 				proxy.Tr.Proxy = func(req *http.Request) (*url.URL, error) {
 					return url.Parse(p.ProxyURL)
 				}
+				proxy.Tr.IdleConnTimeout = time.Second * 10
 			}
+		}
 
+		// 设置超时机制
+		if proxy.Tr != nil {
+			proxy.Tr.TLSHandshakeTimeout = defaultTimeOut
+			proxy.Tr.ResponseHeaderTimeout = defaultTimeOut
+			proxy.Tr.IdleConnTimeout = defaultTimeOut
+			proxy.Tr.ExpectContinueTimeout = defaultTimeOut
 		}
 	case <-time.After(defaultTimeOut):
 		c.Writer.WriteHeader(http.StatusInternalServerError)

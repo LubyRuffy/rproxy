@@ -1,4 +1,5 @@
 /rproxy
+/rproxy*.exe
 /*.sqlite*
 /dbip-city-lite-*.mmdb
 /dist

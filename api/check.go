@@ -62,7 +62,7 @@ var (
 			return &rs, nil
 		}
 
-		return
+		return nil, errors.New(headerString(resp))
 	}
 
 	defaultHTTPsCheckUrl  = "https://p.bmh.im"

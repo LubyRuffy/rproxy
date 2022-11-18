@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/LubyRuffy/gorestful"
+	"github.com/LubyRuffy/rproxy/checkproxy"
 	"github.com/LubyRuffy/rproxy/models"
 	"github.com/gammazero/workerpool"
 	"github.com/gin-contrib/pprof"
@@ -23,7 +24,7 @@ var (
 	EnableDebug bool // 启动debug开关
 
 	srv         *http.Server // http服务器
-	Version     = "v0.1.6"
+	Version     = checkproxy.Version
 	Prefix      = "/api"
 	authUserKey = "token"  // 存在context中的token主键
 	authUserId  = "userId" // 存在context中的token主键
@@ -263,10 +264,10 @@ func loadRestApi(router *gin.Engine) {
 
 	// 替换字段
 	res.SetEnumField("ProxyLevel", [][]interface{}{
-		{models.ProxyAnonymityUnknown, "Unknown"},
-		{models.ProxyAnonymityElite, "Elite"},
-		{models.ProxyAnonymityAnonymous, "Anonymous"},
-		{models.ProxyAnonymityTransparent, "Transparent"},
+		{checkproxy.ProxyAnonymityUnknown, "Unknown"},
+		{checkproxy.ProxyAnonymityElite, "Elite"},
+		{checkproxy.ProxyAnonymityAnonymous, "Anonymous"},
+		{checkproxy.ProxyAnonymityTransparent, "Transparent"},
 	})
 
 	gorestful.AddResourceApiPageToGin(res)
@@ -300,7 +301,7 @@ func Start(addr string) error {
 	}
 
 	// 检查公网IP
-	GetPublicIP()
+	checkproxy.GetPublicIP()
 
 	router := gin.Default()
 	router.NoRoute(defaultHandler)

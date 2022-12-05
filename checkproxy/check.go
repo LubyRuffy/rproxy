@@ -159,7 +159,7 @@ func checkProtocolHost(protocol string, host string, afterCallback func(string, 
 		var req *http.Request
 		req, err = http.NewRequest("GET", defaultCheckUrl, nil)
 		if err != nil {
-			log.Println("check host failed, host:", host, ", new request err:", err)
+			//log.Println("check host failed, host:", host, ", new request err:", err)
 			return &ProxyResult{Error: err}
 		}
 		req.Header.Set(defaultCheckHeader, Version)
@@ -174,7 +174,7 @@ func checkProtocolHost(protocol string, host string, afterCallback func(string, 
 			var rs interface{}
 			rs, err = defaultCheckFunc(resp)
 			if err != nil {
-				log.Println("check host failed, host:", host, ", decode err:", err)
+				//log.Println("check host failed, host:", host, ", decode err:", err)
 				return &ProxyResult{Error: err}
 			}
 

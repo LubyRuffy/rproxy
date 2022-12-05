@@ -21,6 +21,20 @@ const (
 	ProxyAnonymityTransparent                            // 透明代理
 )
 
+func (p ProxyAnonymityLevel) String() string {
+	switch p {
+	case ProxyAnonymityUnknown:
+		return "ProxyAnonymityUnknown"
+	case ProxyAnonymityElite:
+		return "ProxyAnonymityElite"
+	case ProxyAnonymityAnonymous:
+		return "ProxyAnonymityAnonymous"
+	case ProxyAnonymityTransparent:
+		return "ProxyAnonymityTransparent"
+	}
+	return ""
+}
+
 type ProxyResult struct {
 	Valid          bool                   // 是否代理
 	Cost           time.Duration          // 耗时

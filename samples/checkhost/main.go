@@ -49,9 +49,10 @@ func main() {
 				for host := range queueCh {
 					r := checkproxy.CheckHost(host, nil)
 					if r.Valid {
-						fmt.Println("\n", r.Url, r.ProxyLevel, r.SupportConnect, r.Upstream)
+						os.Stderr.WriteString("\n")
+						fmt.Println(r)
 					} else {
-						fmt.Print(".")
+						os.Stderr.WriteString(".")
 					}
 				}
 			}()
